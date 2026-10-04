@@ -1,0 +1,47 @@
+# Local dependencies and generated output
+**/node_modules/
+**/.dart_tool/
+**/.pub-cache/
+**/.pub/
+**/build/
+**/coverage/
+**/.gradle/
+**/.cxx/
+**/Pods/
+**/ephemeral/
+**/.flutter-plugins-dependencies
+**/.idea/
+**/.vscode/
+*.iml
+*.log
+*.apk
+*.aab
+*.ipa
+*.zip
+*.pyc
+**/__pycache__/
+# Machine-specific settings, credentials and signing material
+**/local.properties
+**/key.properties
+**/.env
+**/.env.*
+!**/.env.example
+*.jks
+*.keystore
+*.pem
+*.key
+*.p12
+*.pfx
+**/google-services.json
+**/GoogleService-Info.plist
+# Generated registrants and device/compiler configuration
+**/GeneratedPluginRegistrant.*
+**/Generated.xcconfig
+**/flutter_export_environment.sh
+**/xcuserdata/
+# Local QA screenshots, recordings and transient reports
+**/docs/previews/
+**/*-results.txt
+**/isolated.txt
+.DS_Store
+Thumbs.db

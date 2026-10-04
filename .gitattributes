@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.dart text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.kts text eol=lf
+*.sh text eol=lf
+*.png binary
+*.ttf binary
