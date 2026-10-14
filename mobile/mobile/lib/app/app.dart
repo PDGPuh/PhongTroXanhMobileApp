@@ -161,6 +161,8 @@ class _PhongTroXanhAppState extends State<PhongTroXanhApp> {
         '/admin/cccd' => AdminQueueScreen(state: state),
         '/admin/users' => AdminUsersScreen(),
         '/admin/reports' => AdminReportsScreen(),
+        '/admin/packages' => AdminPackagesScreen(state: state),
+        '/admin/disputes' => AdminDisputesScreen(state: state),
         _ => null,
       };
     }
@@ -216,7 +218,7 @@ class _PhongTroXanhAppState extends State<PhongTroXanhApp> {
         'roommate' => 1,
         'messages' => 3,
         'profile' => 4,
-        'admin' => 4,
+        'admin' => state.role == UserRole.admin ? 0 : 4,
         _ => 0,
       },
     );
@@ -326,19 +328,16 @@ class _AppShellState extends State<AppShell> {
         admin = state.role == UserRole.admin;
     final navLabelLines =
         landlord ||
+            admin ||
             MediaQuery.sizeOf(context).width < 360 ||
             MediaQuery.textScalerOf(context).scale(12) > 14
         ? 2
         : 1;
     final labels = landlord
         ? ['Tổng quan', 'Quản lý phòng', 'Tin nhắn', 'Đánh giá', 'Cá nhân']
-        : [
-            'Khám phá',
-            'Bạn ở',
-            'Nhận phòng',
-            'Tin nhắn',
-            admin ? 'Quản trị' : 'Cá nhân',
-          ];
+        : admin
+        ? ['Tổng quan', 'Duyệt CCCD', 'Duyệt phòng', 'Báo cáo', 'Người dùng']
+        : ['Khám phá', 'Bạn ở', 'Nhận phòng', 'Tin nhắn', 'Cá nhân'];
     final icons = landlord
         ? [
             LucideIcons.house,
@@ -346,6 +345,14 @@ class _AppShellState extends State<AppShell> {
             LucideIcons.messageCircle,
             LucideIcons.star,
             LucideIcons.user,
+          ]
+        : admin
+        ? [
+            LucideIcons.layoutDashboard,
+            LucideIcons.fileCheck,
+            LucideIcons.house,
+            LucideIcons.flag,
+            LucideIcons.users,
           ]
         : [
             LucideIcons.search,
@@ -362,6 +369,34 @@ class _AppShellState extends State<AppShell> {
             LandlordReviewsScreen(state: state),
             ProfileScreen(state: state, onLogout: widget.onLogout),
           ]
+        : admin
+        ? <Widget>[
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminScreen(state: state),
+            ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminQueueScreen(state: state),
+            ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminRoomsScreen(state: state),
+            ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminReportsScreen(state: state),
+            ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminUsersScreen(state: state),
+            ),
+          ]
         : <Widget>[
             RoomFeedView(state: state),
             DiscoverScreen(state: state, person: true),
@@ -375,20 +410,14 @@ class _AppShellState extends State<AppShell> {
               policy: const RoutePolicy(),
               child: MessagesScreen(state: state),
             ),
-            admin
-                ? AccessGuard(
-                    state: state,
-                    policy: const RoutePolicy(role: UserRole.admin),
-                    child: AdminScreen(state: state),
-                  )
-                : AccessGuard(
-                    state: state,
-                    policy: const RoutePolicy(),
-                    child: ProfileScreen(
-                      state: state,
-                      onLogout: widget.onLogout,
-                    ),
-                  ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(),
+              child: ProfileScreen(
+                state: state,
+                onLogout: widget.onLogout,
+              ),
+            ),
           ];
     return Scaffold(
       body: SafeArea(
@@ -404,7 +433,7 @@ class _AppShellState extends State<AppShell> {
         labels: labels,
         icons: icons,
         labelLines: navLabelLines,
-        unreadIndex: state.conversations.any((c) => c.unread > 0)
+        unreadIndex: !admin && state.conversations.any((c) => c.unread > 0)
             ? (landlord ? 2 : 3)
             : null,
         onSelected: selectTab,

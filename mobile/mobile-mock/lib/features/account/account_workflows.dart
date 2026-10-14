@@ -25,11 +25,17 @@ class ProfileSetupScreen extends StatefulWidget {
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final form = GlobalKey<FormState>();
-  late final TextEditingController name, mail, bio, school, minimum, maximum;
-  late String gender, district, birthday;
+  late final TextEditingController name,
+      mail,
+      bio,
+      school,
+      minimum,
+      maximum,
+      ownerAddress;
+  late String gender, district, birthday, roomCountRange, primaryRoomType;
   late PhotoKind avatar;
   LocalPhoto? avatarPhoto;
-  late Set<String> interests;
+  late Set<String> interests, operatingDistricts;
   late bool smoke, early, tidy;
   int step = 0;
   String get draftKey =>
@@ -55,9 +61,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     school = TextEditingController(text: d['school'] ?? p.school);
     minimum = TextEditingController(text: '${d['min'] ?? p.budgetMin}');
     maximum = TextEditingController(text: '${d['max'] ?? p.budgetMax}');
+    ownerAddress = TextEditingController(text: d['ownerAddress'] ?? p.address);
     gender = d['gender'] ?? p.gender;
     district = d['district'] ?? p.district;
     birthday = d['birthday'] ?? p.birthday;
+    roomCountRange = d['roomCountRange'] ?? p.roomCountRange;
+    primaryRoomType = d['primaryRoomType'] ?? p.primaryRoomType;
     avatar = PhotoKind.values.firstWhere(
       (a) => a.name == d['avatar'],
       orElse: () => p.avatar,
@@ -66,11 +75,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ? s.ownPhoto(d['avatarPhoto'])
         : p.avatarPhoto;
     interests = {...(d['interests'] as List?)?.cast<String>() ?? s.interests};
+    operatingDistricts = {
+      ...(d['operatingDistricts'] as List?)?.cast<String>() ??
+          p.operatingDistricts,
+    };
     smoke = d['smoke'] ?? s.smoking;
     early = d['early'] ?? s.earlySleep;
     tidy = d['tidy'] ?? s.tidy;
     step = (d['step'] as int? ?? 0).clamp(0, steps.length - 1);
-    for (final c in [name, mail, bio, school, minimum, maximum]) {
+    for (final c in [
+      name,
+      mail,
+      bio,
+      school,
+      minimum,
+      maximum,
+      ownerAddress,
+    ]) {
       c.addListener(saveDraft);
     }
   }
@@ -82,12 +103,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     'school': school.text,
     'min': minimum.text,
     'max': maximum.text,
+    'ownerAddress': ownerAddress.text,
     'gender': gender,
     'district': district,
     'birthday': birthday,
+    'roomCountRange': roomCountRange,
+    'primaryRoomType': primaryRoomType,
     'avatar': avatar.name,
     'avatarPhoto': avatarPhoto?.id,
     'interests': interests.toList(),
+    'operatingDistricts': operatingDistricts.toList(),
     'smoke': smoke,
     'early': early,
     'tidy': tidy,
@@ -100,7 +125,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   @override
   void dispose() {
-    for (final c in [name, mail, bio, school, minimum, maximum]) {
+    for (final c in [
+      name,
+      mail,
+      bio,
+      school,
+      minimum,
+      maximum,
+      ownerAddress,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -357,11 +390,72 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         : null,
                   ),
                 ]),
-              if (!all && owner && step == 1)
-                flowCard('Phòng trọ của bạn', [
+              if ((all && owner) || (!all && owner && step == 1))
+                flowCard('Quy mô & Phòng trọ của bạn', [
                   Text(
-                    '${widget.state.myRooms.length} phòng trong tài khoản',
-                    style: PT.body(15),
+                    'Hiện có ${widget.state.myRooms.length} phòng đã đăng trong tài khoản',
+                    style: PT.body(15, PT.green),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: ownerAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Địa chỉ liên hệ chủ trọ',
+                      hintText: 'Số nhà, đường, phường/xã...',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: roomCountRange,
+                    decoration: const InputDecoration(
+                      labelText: 'Số lượng phòng dự kiến cho thuê',
+                    ),
+                    items: ['Chưa có', '1-5', '6-10', 'Trên 10']
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
+                    onChanged: (v) => change(() => roomCountRange = v!),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: primaryRoomType,
+                    decoration: const InputDecoration(
+                      labelText: 'Loại hình phòng cho thuê chính',
+                    ),
+                    items: ['Studio', 'Phòng trọ', 'Căn hộ mini', 'Nguyên căn']
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
+                    onChanged: (v) => change(() => primaryRoomType = v!),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('Khu vực hoạt động chính', style: PT.body(14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      'Quận 10',
+                      'Quận 3',
+                      'Thủ Đức',
+                      'Bình Thạnh',
+                      'Quận 1',
+                      'Quận 7',
+                    ]
+                        .map(
+                          (d) => FilterChip(
+                            label: Text(d),
+                            selected: operatingDistricts.contains(d),
+                            onSelected: (v) => change(() {
+                              if (v) {
+                                operatingDistricts.add(d);
+                              } else if (operatingDistricts.length > 1) {
+                                operatingDistricts.remove(d);
+                              }
+                            }),
+                          ),
+                        )
+                        .toList(),
                   ),
                   const SizedBox(height: 16),
                   PrimaryButton(
@@ -391,11 +485,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               if (!all && step == steps.length - 1)
                 flowCard('Sẵn sàng bắt đầu', [
                   Text(name.text, style: PT.title(24)),
-                  Text(
-                    '$district • ${maximum.text}đ/tháng',
-                    style: PT.body(15),
-                  ),
-                  Text(interests.join(' • ')),
+                  if (owner) ...[
+                    Text(
+                      'Quy mô: $roomCountRange phòng • Loại chính: $primaryRoomType',
+                      style: PT.body(15),
+                    ),
+                    Text('Khu vực: ${operatingDistricts.join(', ')}'),
+                  ] else ...[
+                    Text(
+                      '$district • ${maximum.text}đ/tháng',
+                      style: PT.body(15),
+                    ),
+                    Text(interests.join(' • ')),
+                  ],
                   Text('Xác minh: ${widget.state.verification}'),
                 ]),
             ],
@@ -445,6 +547,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       final p =
                           widget.state.store.profiles[widget.state.userId]!;
                       p.school = school.text.trim();
+                      p.address = ownerAddress.text.trim();
+                      p.roomCountRange = roomCountRange;
+                      p.primaryRoomType = primaryRoomType;
+                      p.operatingDistricts = {...operatingDistricts};
                       p.avatar = avatar;
                       p.avatarPhoto = avatarPhoto;
                       p.gender = gender;

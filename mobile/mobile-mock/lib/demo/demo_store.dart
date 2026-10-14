@@ -1,3 +1,5 @@
+
+
 import '../app/session.dart';
 import 'models.dart';
 import 'workflow_models.dart';
@@ -16,6 +18,49 @@ class DemoStore {
   final List<SwapProposal> proposals = [];
   final List<PaymentOrder> orders = [];
   final List<SupportTicket> tickets = [];
+  final List<ServicePlan> plans = [...ServicePlan.catalog];
+  final List<SystemFeedbackRecord> systemFeedbacks = [
+    SystemFeedbackRecord(
+      id: 'fb-1',
+      authorName: 'Nguyễn Hoài An',
+      roleLabel: 'Người thuê',
+      rating: 5,
+      comment: 'Ứng dụng tìm phòng và ghép bạn ở rất trực quan, thông tin minh bạch.',
+      createdAt: DateTime(2026, 10, 10, 9, 30),
+    ),
+    SystemFeedbackRecord(
+      id: 'fb-2',
+      authorName: 'Cô Hồng',
+      roleLabel: 'Chủ trọ',
+      rating: 5,
+      comment: 'Tính năng mã QR nhận phòng và quản lý hợp đồng giúp tôi tiết kiệm nhiều thời gian.',
+      createdAt: DateTime(2026, 10, 11, 14, 15),
+    ),
+    SystemFeedbackRecord(
+      id: 'fb-3',
+      authorName: 'Trần Minh',
+      roleLabel: 'Người thuê',
+      rating: 4,
+      comment: 'Bộ lọc thông minh hoạt động tốt, mong có thêm nhiều phòng khu vực Thủ Đức.',
+      createdAt: DateTime(2026, 10, 12, 18, 45),
+    ),
+  ];
+  final List<AuditLogRecord> auditLogs = [
+    AuditLogRecord(
+      id: 'audit-1',
+      actorName: 'Quản trị viên',
+      action: 'KHỞI TẠO HỆ THỐNG',
+      target: 'Cấu hình gói dịch vụ & kiểm duyệt tự động',
+      timestamp: DateTime(2026, 10, 1, 8, 0),
+    ),
+    AuditLogRecord(
+      id: 'audit-2',
+      actorName: 'Quản trị viên',
+      action: 'DUYỆT TIN PHÒNG',
+      target: 'Phòng r1 • Studio xanh gần Bách Khoa',
+      timestamp: DateTime(2026, 10, 5, 10, 20),
+    ),
+  ];
   // An explicit incoming demo like; other likes remain one-way.
   final Map<String, Set<String>> incomingLikes = {
     'tenant-a': {'p1'},

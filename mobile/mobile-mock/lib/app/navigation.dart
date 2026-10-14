@@ -27,7 +27,9 @@ class RoutePolicy {
         page is AdminUsersScreen ||
         page is AdminReportsScreen ||
         page is AdminDecisionScreen ||
-        page is AdminRoomsScreen) {
+        page is AdminRoomsScreen ||
+        page is AdminPackagesScreen ||
+        page is AdminDisputesScreen) {
       return const RoutePolicy(role: UserRole.admin);
     }
     if (page is LandlordScreen ||
@@ -125,6 +127,8 @@ class AppDestination {
           '/admin/users',
           '/admin/reports',
           '/admin/rooms',
+          '/admin/packages',
+          '/admin/disputes',
           '/packages',
           '/payments',
           '/reviews',

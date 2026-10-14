@@ -22,6 +22,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
   final comment = TextEditingController();
   late String? id = widget.rentalId;
   int rating = 5;
+  int cleanlinessRating = 5;
+  int accuracyRating = 5;
+  int communicationRating = 5;
   final tags = <String>{};
   @override
   void dispose() {
@@ -74,6 +77,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     id = v;
                     comment.clear();
                     rating = 5;
+                    cleanlinessRating = 5;
+                    accuracyRating = 5;
+                    communicationRating = 5;
                     tags.clear();
                   }),
           ),
@@ -91,8 +97,20 @@ class _ReviewScreenState extends State<ReviewScreen> {
           if (previous != null)
             flowCard('Đánh giá đã gửi • ${previous.id}', [
               Text('${previous.rating}/5 sao'),
+              Text(
+                'Chi tiết: Vệ sinh ${previous.cleanlinessRating}★ • Mô tả ${previous.accuracyRating}★ • Giao tiếp ${previous.communicationRating}★',
+                style: PT.body(12, PT.muted),
+              ),
+              const SizedBox(height: 6),
               Text(previous.comment),
               Text(previous.tags.join(' • ')),
+              if (previous.landlordReply != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Phản hồi chủ trọ: ${previous.landlordReply}',
+                  style: PT.body(13, PT.green),
+                ),
+              ],
             ])
           else ...[
             Wrap(
@@ -114,7 +132,38 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ActionChip(
+                  label: Text('Vệ sinh: $cleanlinessRating★'),
+                  onPressed: f.busy
+                      ? null
+                      : () => setState(
+                          () => cleanlinessRating = cleanlinessRating % 5 + 1,
+                        ),
+                ),
+                ActionChip(
+                  label: Text('Mô tả: $accuracyRating★'),
+                  onPressed: f.busy
+                      ? null
+                      : () =>
+                          setState(() => accuracyRating = accuracyRating % 5 + 1),
+                ),
+                ActionChip(
+                  label: Text('Giao tiếp: $communicationRating★'),
+                  onPressed: f.busy
+                      ? null
+                      : () => setState(
+                          () =>
+                              communicationRating = communicationRating % 5 + 1,
+                        ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -145,15 +194,15 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       )
                       .toList(),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             TextField(
               controller: comment,
-              maxLines: 5,
+              maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'Chia sẻ trải nghiệm của bạn',
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             PrimaryButton(
               'Gửi đánh giá',
               busy: f.busy,
@@ -165,6 +214,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         rating,
                         comment.text,
                         tags.toList(),
+                        cleanlinessRating: cleanlinessRating,
+                        accuracyRating: accuracyRating,
+                        communicationRating: communicationRating,
                       ),
                     ),
             ),
@@ -205,9 +257,24 @@ class ReviewHistoryScreen extends StatelessWidget {
               'Đối tượng: ${r.targetType} ${r.targetId} • ${r.rentalId}',
               style: PT.body(12, PT.muted),
             ),
+            Text(
+              'Vệ sinh ${r.cleanlinessRating}★ • Mô tả ${r.accuracyRating}★ • Giao tiếp ${r.communicationRating}★',
+              style: PT.body(12, PT.green),
+            ),
             const SizedBox(height: 10),
             Text(r.comment, style: PT.body(15)),
             Text(r.tags.join(' • ')),
+            if (r.landlordReply != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: PT.card(color: PT.mint),
+                child: Text(
+                  'Phản hồi chủ trọ: ${r.landlordReply}',
+                  style: PT.body(13),
+                ),
+              ),
+            ],
             if (r.authorId != state.userId)
               TextButton(
                 onPressed: () => openPage(
@@ -226,71 +293,264 @@ class ReviewHistoryScreen extends StatelessWidget {
   );
 }
 
-class LandlordTenantsScreen extends StatelessWidget {
+class LandlordTenantsScreen extends StatefulWidget {
   final AppState state;
   final String? roomId;
   const LandlordTenantsScreen({super.key, required this.state, this.roomId});
-  List<Rental> get rentals => state.rentals
-      .where((r) => roomId == null || r.room.id == roomId)
-      .toList();
   @override
-  Widget build(BuildContext context) => FlowPage(
-    state: state,
-    title: 'Người thuê',
-    content: (ctx, f) => [
-      if (rentals.isEmpty)
-        const EmptyState(
-          'Chưa có người thuê',
-          'Hợp đồng thuộc phòng của bạn sẽ xuất hiện ở đây.',
-        ),
-      for (final r in rentals)
-        flowCard(state.store.workspaceById(r.tenantId).fullName, [
-          Text(r.room.title, style: PT.body(16)),
-          Text('${r.id} • ${r.status.label}'),
-          Text(
-            r.checkedIn ? 'Đã nhận phòng' : 'Chờ nhận phòng',
-            style: PT.body(14, PT.green),
+  State<LandlordTenantsScreen> createState() => _LandlordTenantsScreenState();
+}
+
+class _LandlordTenantsScreenState extends State<LandlordTenantsScreen> {
+  String filter = 'Tất cả';
+
+  List<Rental> get allRentals => widget.state.rentals
+      .where((r) => widget.roomId == null || r.room.id == widget.roomId)
+      .toList();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    return FlowPage(
+      state: state,
+      title: 'Người thuê',
+      content: (ctx, f) {
+        final rentals = allRentals.where((r) {
+          if (filter == 'Đã nhận phòng') {
+            return r.checkedIn && r.status == RentalStatus.active;
+          }
+          if (filter == 'Chờ nhận phòng') {
+            return !r.checkedIn && r.status == RentalStatus.active;
+          }
+          if (filter == 'Đã kết thúc') {
+            return r.status == RentalStatus.terminated ||
+                r.status == RentalStatus.expired;
+          }
+          return true;
+        }).toList();
+
+        final activeCount = allRentals
+            .where((r) => r.status == RentalStatus.active)
+            .length;
+        final verifiedCount = allRentals
+            .where(
+              (r) =>
+                  state.store.workspaceById(r.tenantId).verification ==
+                  'Đã xác minh',
+            )
+            .length;
+        final avgTrust = allRentals.isEmpty
+            ? 90
+            : (allRentals
+                          .map(
+                            (r) =>
+                                state.store.profiles[r.tenantId]?.trustScore ??
+                                88,
+                          )
+                          .reduce((a, b) => a + b) /
+                      allRentals.length)
+                  .round();
+
+        return [
+          LayoutBuilder(
+            builder: (context, c) => Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final stat in [
+                  ('Đang thuê', '$activeCount hợp đồng'),
+                  ('TrustScore TB', '$avgTrust/100 điểm'),
+                  ('CCCD xác minh', '$verifiedCount/${allRentals.length} khách'),
+                ])
+                  SizedBox(
+                    width: c.maxWidth < 340
+                        ? (c.maxWidth - 8) / 2
+                        : (c.maxWidth - 16) / 3,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: PT.card(color: PT.mint),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(stat.$1, style: PT.body(11, PT.muted)),
+                          const SizedBox(height: 4),
+                          Text(stat.$2, style: PT.title(15)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
-          if (r.checkedIn && r.status == RentalStatus.active) ...[
-            PrimaryButton(
-              'Đánh giá người thuê',
-              outline: true,
-              onTap: () =>
-                  openPage(ctx, ReviewScreen(state: state, rentalId: r.id)),
-            ),
-            const SizedBox(height: 12),
-          ],
-          PrimaryButton(
-            'Liên hệ người thuê',
-            onTap: () {
-              final existing = state.conversations
-                  .where(
-                    (c) =>
-                        c.participantId == r.tenantId && c.roomId == r.room.id,
-                  )
-                  .firstOrNull;
-              final c =
-                  existing ??
-                  Conversation(
-                    id: 'tenant-chat-${r.id}',
-                    name: state.store.workspaceById(r.tenantId).fullName,
-                    time: '',
-                    subtitle: '',
-                    participantId: r.tenantId,
-                    roomId: r.room.id,
-                    messages: [],
-                  );
-              if (existing == null) {
-                state.conversations.add(c);
-                state.changed();
-              }
-              openPage(ctx, ChatScreen(state: state, conversation: c));
-            },
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              'Tất cả',
+              'Đã nhận phòng',
+              'Chờ nhận phòng',
+              'Đã kết thúc',
+            ]
+                .map(
+                  (v) => ChoiceChip(
+                    label: Text(v),
+                    selected: filter == v,
+                    onSelected: (_) => setState(() => filter = v),
+                  ),
+                )
+                .toList(),
           ),
-        ]),
-    ],
-  );
+          const SizedBox(height: 14),
+          if (rentals.isEmpty)
+            const EmptyState(
+              'Chưa có người thuê',
+              'Hợp đồng thuộc phòng của bạn sẽ xuất hiện ở đây.',
+            ),
+          for (final r in rentals)
+            flowCard(state.store.workspaceById(r.tenantId).fullName, [
+              Text(r.room.title, style: PT.body(16)),
+              Text('${r.id} • ${r.status.label}'),
+              Text(
+                r.checkedIn ? 'Đã nhận phòng' : 'Chờ nhận phòng',
+                style: PT.body(14, PT.green),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  Pill(
+                    'TrustScore: ${state.store.profiles[r.tenantId]?.trustScore ?? 88}/100',
+                    color: PT.green,
+                  ),
+                  Pill(
+                    state.store.workspaceById(r.tenantId).verification,
+                    color:
+                        state.store.workspaceById(r.tenantId).verification ==
+                            'Đã xác minh'
+                        ? PT.green
+                        : PT.amber,
+                  ),
+                  if (r.handoverConfirmed)
+                    const Pill('Đã bàn giao phòng', color: PT.green),
+                ],
+              ),
+              if (r.terminationReason != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Lý do thanh lý: ${r.terminationReason}',
+                  style: PT.body(13, PT.error),
+                ),
+              ],
+              const SizedBox(height: 12),
+              if (!r.checkedIn && r.status == RentalStatus.active) ...[
+                PrimaryButton(
+                  'Xác nhận bàn giao phòng',
+                  outline: true,
+                  busy: f.busy,
+                  onTap: f.busy
+                      ? null
+                      : () => f.perform(
+                          () => state.workflows.confirmHandover(r.id),
+                        ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (r.checkedIn && r.status == RentalStatus.active) ...[
+                PrimaryButton(
+                  'Đánh giá người thuê',
+                  outline: true,
+                  onTap: () => openPage(
+                    ctx,
+                    ReviewScreen(state: state, rentalId: r.id),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              PrimaryButton(
+                'Liên hệ người thuê',
+                onTap: () {
+                  final existing = state.conversations
+                      .where(
+                        (c) =>
+                            c.participantId == r.tenantId &&
+                            c.roomId == r.room.id,
+                      )
+                      .firstOrNull;
+                  final c =
+                      existing ??
+                      Conversation(
+                        id: 'tenant-chat-${r.id}',
+                        name: state.store.workspaceById(r.tenantId).fullName,
+                        time: '',
+                        subtitle: '',
+                        participantId: r.tenantId,
+                        roomId: r.room.id,
+                        messages: [],
+                      );
+                  if (existing == null) {
+                    state.conversations.add(c);
+                    state.changed();
+                  }
+                  openPage(ctx, ChatScreen(state: state, conversation: c));
+                },
+              ),
+              if (r.status == RentalStatus.active) ...[
+                const SizedBox(height: 6),
+                TextButton.icon(
+                  icon: const Icon(
+                    LucideIcons.fileX,
+                    size: 16,
+                    color: PT.error,
+                  ),
+                  onPressed: f.busy
+                      ? null
+                      : () async {
+                          final reasonCtrl = TextEditingController();
+                          final reason = await showDialog<String>(
+                            context: ctx,
+                            builder: (d) => AlertDialog(
+                              title: const Text('Chấm dứt hợp đồng'),
+                              content: TextField(
+                                controller: reasonCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Lý do chấm dứt / thanh lý',
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(d),
+                                  child: const Text('Hủy'),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(d, reasonCtrl.text),
+                                  child: const Text('Xác nhận'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (reason != null && reason.trim().isNotEmpty) {
+                            await f.perform(
+                              () => state.workflows.terminateRental(
+                                r.id,
+                                reason,
+                              ),
+                            );
+                          }
+                        },
+                  label: Text(
+                    'Chấm dứt hợp đồng',
+                    style: PT.body(13, PT.error),
+                  ),
+                ),
+              ],
+            ]),
+        ];
+      },
+    );
+  }
 }
 
 class SwapScreen extends StatefulWidget {
@@ -700,112 +960,449 @@ class _SwapScreenState extends State<SwapScreen> {
   );
 }
 
-class LandlordSwapsScreen extends StatelessWidget {
+class LandlordSwapsScreen extends StatefulWidget {
   final AppState state;
   const LandlordSwapsScreen({super.key, required this.state});
   @override
-  Widget build(BuildContext context) => FlowPage(
-    state: state,
-    title: 'Yêu cầu đổi phòng',
-    content: (ctx, f) => [
-      if (state.swaps.isEmpty)
-        const EmptyState(
-          'Chưa có yêu cầu',
-          'Chỉ yêu cầu thuộc phòng của bạn được hiển thị.',
-        ),
-      for (final s in state.swaps)
-        flowCard('${s.id} • ${s.status}', [
-          Text(state.roomById(s.roomId)?.title ?? s.roomId),
-          Text(state.store.workspaceById(s.tenantId).fullName),
-          Text(s.reason),
-          Text('${s.targetDistrict} • ${s.targetType} • ${s.budgetMax}đ'),
-          Text(s.decisionNote),
-          if (s.status == 'Chờ duyệt') ...[
-            const SizedBox(height: 12),
-            PrimaryButton(
-              'Duyệt yêu cầu',
-              busy: f.busy,
-              onTap: f.busy
-                  ? null
-                  : () => f.perform(
-                      () => state.workflows.decideSwap(
-                        s.id,
-                        true,
-                        'Chủ trọ đồng ý mở tin đổi phòng',
-                      ),
-                    ),
+  State<LandlordSwapsScreen> createState() => _LandlordSwapsScreenState();
+}
+
+class _LandlordSwapsScreenState extends State<LandlordSwapsScreen> {
+  String filter = 'Tất cả';
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    return FlowPage(
+      state: state,
+      title: 'Yêu cầu đổi phòng',
+      content: (ctx, f) {
+        final items = state.swaps.where((s) {
+          if (filter == 'Chờ duyệt') return s.status == 'Chờ duyệt';
+          if (filter == 'Đã duyệt') return s.status == 'Đã duyệt';
+          if (filter == 'Lịch sử') return s.status != 'Chờ duyệt';
+          return true;
+        }).toList();
+
+        return [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ['Tất cả', 'Chờ duyệt', 'Đã duyệt', 'Lịch sử']
+                .map(
+                  (v) => ChoiceChip(
+                    label: Text(v),
+                    selected: filter == v,
+                    onSelected: (_) => setState(() => filter = v),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 14),
+          if (items.isEmpty)
+            const EmptyState(
+              'Chưa có yêu cầu',
+              'Chỉ yêu cầu thuộc phòng của bạn được hiển thị.',
             ),
-            TextButton(
-              onPressed: f.busy
-                  ? null
-                  : () async {
-                      final c = TextEditingController();
-                      final note = await showDialog<String>(
-                        context: ctx,
-                        builder: (d) => AlertDialog(
-                          title: const Text('Lý do từ chối'),
-                          content: TextField(
-                            controller: c,
-                            decoration: const InputDecoration(
-                              labelText: 'Lý do',
+          for (final s in items)
+            flowCard('${s.id} • ${s.status}', [
+              Text(
+                state.roomById(s.roomId)?.title ?? s.roomId,
+                style: PT.title(19),
+              ),
+              Text(state.store.workspaceById(s.tenantId).fullName),
+              Text(s.reason),
+              Text('${s.targetDistrict} • ${s.targetType} • ${s.budgetMax}đ'),
+              if (s.decisionNote.isNotEmpty) Text(s.decisionNote),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: PT.card(color: PT.mint),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'So sánh người thuê chuyển đi & thay thế',
+                      style: PT.title(16),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '• Chuyển đi: ${state.store.workspaceById(s.tenantId).fullName} (TrustScore: ${state.store.profiles[s.tenantId]?.trustScore ?? 91}/100 • ${state.store.workspaceById(s.tenantId).verification})',
+                      style: PT.body(13),
+                    ),
+                    const SizedBox(height: 4),
+                    Builder(
+                      builder: (_) {
+                        final prop = state.store.proposals
+                            .where((p) => p.listingId == s.id)
+                            .firstOrNull;
+                        if (prop != null) {
+                          final incomingName = state.store
+                              .workspaceById(prop.proposerId)
+                              .fullName;
+                          final incomingScore =
+                              state
+                                  .store
+                                  .profiles[prop.proposerId]
+                                  ?.trustScore ??
+                              90;
+                          final incomingVer = state.store
+                              .workspaceById(prop.proposerId)
+                              .verification;
+                          return Text(
+                            '• Chuyển đến: $incomingName (TrustScore: $incomingScore/100 • $incomingVer)',
+                            style: PT.body(13, PT.green),
+                          );
+                        }
+                        final candidate = state.people.firstOrNull;
+                        return Text(
+                          '• Ứng viên dự kiến: ${candidate?.name ?? 'Trần Gia Bảo'} (Hợp ${candidate?.match ?? 94}% • Đã xác minh CCCD)',
+                          style: PT.body(13, PT.green),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                icon: const Icon(LucideIcons.fileText, size: 16),
+                onPressed: () {
+                  final roomTitle = state.roomById(s.roomId)?.title ?? s.roomId;
+                  final outName = state.store
+                      .workspaceById(s.tenantId)
+                      .fullName;
+                  final prop = state.store.proposals
+                      .where((p) => p.listingId == s.id)
+                      .firstOrNull;
+                  final inName = prop != null
+                      ? state.store.workspaceById(prop.proposerId).fullName
+                      : (state.people.firstOrNull?.name ?? 'Trần Gia Bảo');
+                  showDialog<void>(
+                    context: ctx,
+                    builder: (d) => AlertDialog(
+                      title: const Text('Phụ lục hợp đồng nháp'),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'PHỤ LỤC CHUYỂN NHƯỢNG HỢP ĐỒNG THUÊ',
+                              style: PT.title(16),
                             ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(d),
-                              child: const Text('Quay lại'),
+                            const SizedBox(height: 8),
+                            Text('Phòng: $roomTitle'),
+                            Text('Bên chuyển nhượng (A): $outName'),
+                            Text('Bên nhận chuyển nhượng (B): $inName'),
+                            Text(
+                              'Ngày chuyển giao dự kiến: ${s.movingDate.isEmpty ? 'Đầu tháng tới' : s.movingDate}',
                             ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(d, c.text),
-                              child: const Text('Từ chối'),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Điều khoản: Bên B kế thừa toàn bộ quyền và nghĩa vụ hợp đồng thuê hiện tại, bao gồm khoản tiền đặt cọc đã nộp cho Chủ trọ.',
+                              style: PT.body(13, PT.muted),
                             ),
                           ],
                         ),
-                      );
-                      if (note != null) {
-                        await f.perform(
-                          () => state.workflows.decideSwap(s.id, false, note),
-                        );
-                      }
-                    },
-              child: const Text('Từ chối yêu cầu'),
-            ),
-          ],
-        ]),
-    ],
-  );
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(d),
+                          child: const Text('Đóng'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                label: const Text('Xem phụ lục hợp đồng nháp'),
+              ),
+              if (s.status == 'Chờ duyệt') ...[
+                const SizedBox(height: 8),
+                PrimaryButton(
+                  'Duyệt yêu cầu',
+                  busy: f.busy,
+                  onTap: f.busy
+                      ? null
+                      : () => f.perform(
+                          () => state.workflows.decideSwap(
+                            s.id,
+                            true,
+                            'Chủ trọ đồng ý mở tin đổi phòng',
+                          ),
+                        ),
+                ),
+                TextButton(
+                  onPressed: f.busy
+                      ? null
+                      : () async {
+                          final c = TextEditingController();
+                          final note = await showDialog<String>(
+                            context: ctx,
+                            builder: (d) => AlertDialog(
+                              title: const Text('Lý do từ chối'),
+                              content: TextField(
+                                controller: c,
+                                decoration: const InputDecoration(
+                                  labelText: 'Lý do',
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(d),
+                                  child: const Text('Quay lại'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(d, c.text),
+                                  child: const Text('Từ chối'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (note != null) {
+                            await f.perform(
+                              () =>
+                                  state.workflows.decideSwap(s.id, false, note),
+                            );
+                          }
+                        },
+                  child: const Text('Từ chối yêu cầu'),
+                ),
+              ],
+            ]),
+        ];
+      },
+    );
+  }
 }
 
-class LandlordReviewsScreen extends StatelessWidget {
+class LandlordReviewsScreen extends StatefulWidget {
   final AppState state;
   const LandlordReviewsScreen({super.key, required this.state});
   @override
+  State<LandlordReviewsScreen> createState() => _LandlordReviewsScreenState();
+}
+
+class _LandlordReviewsScreenState extends State<LandlordReviewsScreen> {
+  String filter = 'Tất cả';
+
+  @override
   Widget build(BuildContext context) {
-    final s = state;
+    final s = widget.state;
     return FlowPage(
       state: s,
       title: 'Đánh giá',
-      content: (ctx, f) => [
-        PrimaryButton(
-          'Viết đánh giá người thuê',
-          onTap: () => openPage(ctx, ReviewScreen(state: s)),
-        ),
-        const SizedBox(height: 16),
-        PrimaryButton(
-          'Xem đánh giá nhận được / đã gửi',
-          outline: true,
-          onTap: () => openPage(ctx, ReviewHistoryScreen(state: s)),
-        ),
-        const SizedBox(height: 16),
-        for (final r in s.store.reviewRecords.where(
-          (r) => s.myRooms.any((room) => room.id == r.targetId),
-        ))
-          flowCard('${r.authorName} • ${r.rating}/5', [
-            Text(r.comment),
-            Text(r.tags.join(' • ')),
-            Text('Hợp đồng: ${r.rentalId}'),
-          ]),
-      ],
+      content: (ctx, f) {
+        final allReviews = s.store.reviewRecords
+            .where((r) => s.myRooms.any((room) => room.id == r.targetId))
+            .toList();
+        final filtered = allReviews.where((r) {
+          if (filter == 'Chưa phản hồi') return r.landlordReply == null;
+          if (filter == '1-2 sao') return r.rating <= 2;
+          if (filter == 'Khiếu nại') return r.disputeStatus != null;
+          return true;
+        }).toList();
+
+        final avgRating = allReviews.isEmpty
+            ? '4.9'
+            : (allReviews.map((r) => r.rating).reduce((a, b) => a + b) /
+                      allReviews.length)
+                  .toStringAsFixed(1);
+        final repliedCount = allReviews
+            .where((r) => r.landlordReply != null)
+            .length;
+
+        return [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: PT.card(color: PT.mint),
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              alignment: WrapAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Điểm trung bình', style: PT.body(12, PT.muted)),
+                    Text(
+                      '$avgRating ★ (${allReviews.length} đánh giá)',
+                      style: PT.title(20),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Đã phản hồi', style: PT.body(12, PT.muted)),
+                    Text(
+                      '$repliedCount/${allReviews.length} nhận xét',
+                      style: PT.title(18),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          PrimaryButton(
+            'Viết đánh giá người thuê',
+            onTap: () => openPage(ctx, ReviewScreen(state: s)),
+          ),
+          const SizedBox(height: 12),
+          PrimaryButton(
+            'Xem đánh giá nhận được / đã gửi',
+            outline: true,
+            onTap: () => openPage(ctx, ReviewHistoryScreen(state: s)),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ['Tất cả', 'Chưa phản hồi', '1-2 sao', 'Khiếu nại']
+                .map(
+                  (v) => ChoiceChip(
+                    label: Text(v),
+                    selected: filter == v,
+                    onSelected: (_) => setState(() => filter = v),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 14),
+          for (final r in filtered)
+            flowCard('${r.authorName} • ${r.rating}/5', [
+              Text(
+                'Vệ sinh ${r.cleanlinessRating}★ • Mô tả ${r.accuracyRating}★ • Giao tiếp ${r.communicationRating}★',
+                style: PT.body(12, PT.green),
+              ),
+              const SizedBox(height: 6),
+              Text(r.comment),
+              Text(r.tags.join(' • ')),
+              Text('Hợp đồng: ${r.rentalId}'),
+              if (r.landlordReply != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: PT.card(color: PT.mint),
+                  child: Text(
+                    'Phản hồi của bạn: ${r.landlordReply}',
+                    style: PT.body(13),
+                  ),
+                ),
+              ],
+              if (r.disputeStatus != null) ...[
+                const SizedBox(height: 8),
+                Pill('Khiếu nại: ${r.disputeStatus}', color: PT.amber),
+                if (r.disputeResolutionNote != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Kết luận Admin: ${r.disputeResolutionNote}',
+                      style: PT.body(12, PT.muted),
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(LucideIcons.reply, size: 15),
+                    onPressed: f.busy
+                        ? null
+                        : () async {
+                            final c = TextEditingController(
+                              text: r.landlordReply ?? '',
+                            );
+                            final reply = await showDialog<String>(
+                              context: ctx,
+                              builder: (d) => AlertDialog(
+                                title: const Text('Phản hồi đánh giá'),
+                                content: TextField(
+                                  controller: c,
+                                  maxLines: 3,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Nội dung phản hồi công khai',
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(d),
+                                    child: const Text('Hủy'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(d, c.text),
+                                    child: const Text('Gửi phản hồi'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (reply != null && reply.trim().isNotEmpty) {
+                              await f.perform(
+                                () => s.workflows.replyReview(r.id, reply),
+                              );
+                            }
+                          },
+                    label: Text(
+                      r.landlordReply == null
+                          ? 'Phản hồi đánh giá'
+                          : 'Sửa phản hồi',
+                    ),
+                  ),
+                  if (r.disputeStatus == null)
+                    TextButton.icon(
+                      icon: const Icon(
+                        LucideIcons.flag,
+                        size: 15,
+                        color: PT.error,
+                      ),
+                      onPressed: f.busy
+                          ? null
+                          : () async {
+                              final c = TextEditingController();
+                              final reason = await showDialog<String>(
+                                context: ctx,
+                                builder: (d) => AlertDialog(
+                                  title: const Text('Khiếu nại đánh giá'),
+                                  content: TextField(
+                                    controller: c,
+                                    maxLines: 3,
+                                    decoration: const InputDecoration(
+                                      labelText:
+                                          'Lý do khiếu nại lên Quản trị viên',
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(d),
+                                      child: const Text('Hủy'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(d, c.text),
+                                      child: const Text('Gửi khiếu nại'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (reason != null && reason.trim().isNotEmpty) {
+                                await f.perform(
+                                  () =>
+                                      s.workflows.disputeReview(r.id, reason),
+                                );
+                              }
+                            },
+                      label: Text(
+                        'Khiếu nại đánh giá',
+                        style: PT.body(13, PT.error),
+                      ),
+                    ),
+                ],
+              ),
+            ]),
+        ];
+      },
     );
   }
 }

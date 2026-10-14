@@ -190,8 +190,11 @@ class DemoWorkflows {
     String rentalId,
     int rating,
     String comment,
-    List<String> tags,
-  ) => run('review-$rentalId', () {
+    List<String> tags, {
+    int cleanlinessRating = 5,
+    int accuracyRating = 5,
+    int communicationRating = 5,
+  }) => run('review-$rentalId', () {
     final rental = state.reviewableRentals
         .where((r) => r.id == rentalId)
         .firstOrNull;
@@ -220,11 +223,48 @@ class DemoWorkflows {
       rating,
       comment.trim(),
       [...tags],
+      cleanlinessRating: cleanlinessRating,
+      accuracyRating: accuracyRating,
+      communicationRating: communicationRating,
     );
     state.store.reviewRecords.add(record);
     state.reviews[rentalId] = (rating: rating, comment: comment.trim());
     return record;
   });
+
+  Future<void> replyReview(String reviewId, String reply) =>
+      run('reply-review-$reviewId', () {
+        final record = state.store.reviewRecords
+            .where((r) => r.id == reviewId)
+            .firstOrNull;
+        if (record == null ||
+            reply.trim().isEmpty ||
+            !state.myRooms.any((room) => room.id == record.targetId)) {
+          throw const RepositoryFailure(
+            RepositoryFault.denied,
+            'Nhập nội dung phản hồi hợp lệ cho đánh giá thuộc phòng của bạn.',
+          );
+        }
+        record.landlordReply = reply.trim();
+        record.repliedAt = DateTime.now();
+      }, role: UserRole.landlord);
+
+  Future<void> disputeReview(String reviewId, String reason) =>
+      run('dispute-review-$reviewId', () {
+        final record = state.store.reviewRecords
+            .where((r) => r.id == reviewId)
+            .firstOrNull;
+        if (record == null ||
+            reason.trim().isEmpty ||
+            !state.myRooms.any((room) => room.id == record.targetId)) {
+          throw const RepositoryFailure(
+            RepositoryFault.denied,
+            'Nhập lý do khiếu nại và bằng chứng hợp lệ.',
+          );
+        }
+        record.disputeStatus = 'Chờ xử lý';
+        record.disputeReason = reason.trim();
+      }, role: UserRole.landlord);
 
   Future<ReportRecord> report(
     String type,
@@ -500,7 +540,10 @@ class DemoWorkflows {
 
   Future<PaymentOrder> checkout(ServicePlan plan, bool yearly, String method) =>
       run('checkout', () {
-        if (!ServicePlan.catalog.contains(plan) ||
+        final knownPlan =
+            ServicePlan.catalog.contains(plan) ||
+            state.store.plans.any((p) => p.id == plan.id);
+        if (!knownPlan ||
             plan.landlord != (state.role == UserRole.landlord) ||
             state.role == UserRole.admin ||
             (yearly && plan.yearly <= 0) ||
@@ -539,7 +582,8 @@ class DemoWorkflows {
     o.status = result;
     if (result == 'Thành công') {
       final profile = state.store.profiles[state.userId]!;
-      if (['plus', 'gold', 'owner-pro', 'owner-premium'].contains(o.plan.id)) {
+      if (['plus', 'gold', 'owner-pro', 'owner-premium'].contains(o.plan.id) ||
+          o.plan.monthly >= 39000 && o.plan.extraSwipes == 0) {
         profile.package = o.plan.name;
         profile.packageExpiry = DateTime.now().add(
           Duration(days: o.yearly ? 365 : 30),
@@ -574,4 +618,309 @@ class DemoWorkflows {
           );
         }
       });
+
+  Future<void> renewRoom(String roomId, {int days = 30}) =>
+      run('renew-$roomId', () {
+        final room = state.roomById(roomId);
+        if (room == null || room.landlordId != state.userId) {
+          throw const RepositoryFailure(
+            RepositoryFault.denied,
+            'Phòng không thuộc tài khoản của bạn.',
+          );
+        }
+        final base = room.expiresAt != null && room.expiresAt!.isAfter(DateTime.now())
+            ? room.expiresAt!
+            : DateTime.now();
+        final idx = state.store.rooms.indexWhere((r) => r.id == roomId);
+        state.store.rooms[idx] = room.copyWith(
+          expiresAt: base.add(Duration(days: days)),
+        );
+      }, role: UserRole.landlord);
+
+  Future<void> boostRoom(String roomId) => run('boost-room-$roomId', () {
+    final room = state.roomById(roomId);
+    if (room == null || room.landlordId != state.userId) {
+      throw const RepositoryFailure(
+        RepositoryFault.denied,
+        'Phòng không thuộc tài khoản của bạn.',
+      );
+    }
+    final profile = state.store.profiles[state.userId]!;
+    if (profile.boosts <= 0) {
+      throw const RepositoryFailure(
+        RepositoryFault.denied,
+        'Bạn đã hết lượt Đẩy tin. Hãy nâng cấp gói dịch vụ để nhận thêm lượt.',
+      );
+    }
+    profile.boosts--;
+    profile.boostedAt = DateTime.now();
+    final idx = state.store.rooms.indexWhere((r) => r.id == roomId);
+    state.store.rooms[idx] = room.copyWith(isBoosted: true);
+  }, role: UserRole.landlord);
+
+  Future<void> confirmHandover(String rentalId) =>
+      run('handover-$rentalId', () {
+        final rental = state.rentals.where((r) => r.id == rentalId).firstOrNull;
+        if (rental == null || rental.status != RentalStatus.active) {
+          throw const RepositoryFailure(
+            RepositoryFault.denied,
+            'Không tìm thấy hợp đồng đang hoạt động để bàn giao.',
+          );
+        }
+        rental.checkedIn = true;
+        rental.handoverConfirmed = true;
+        final tenantWorkspace = state.store.workspaceById(rental.tenantId);
+        tenantWorkspace.notifications.add(
+          AppNotification(
+            id: 'handover-${rental.id}-${DateTime.now().millisecondsSinceEpoch}',
+            title: 'Đã xác nhận bàn giao phòng',
+            description: 'Chủ trọ đã xác nhận bàn giao phòng ${rental.room.title}.',
+            target: ResourceRef(ResourceKind.rental, rental.id),
+          ),
+        );
+      }, role: UserRole.landlord);
+
+  Future<void> terminateRental(String rentalId, String reason) =>
+      run('terminate-$rentalId', () {
+        final rental = state.rentals.where((r) => r.id == rentalId).firstOrNull;
+        if (rental == null || reason.trim().isEmpty) {
+          throw const RepositoryFailure(
+            RepositoryFault.denied,
+            'Nhập lý do chấm dứt hợp đồng.',
+          );
+        }
+        rental.status = RentalStatus.terminated;
+        rental.terminationReason = reason.trim();
+        final room = state.roomById(rental.room.id);
+        if (room != null) {
+          final idx = state.store.rooms.indexOf(room);
+          state.store.rooms[idx] = room.copyWith(status: RoomStatus.available);
+          state.roomController.feed.clear();
+        }
+      }, role: UserRole.landlord);
+
+  Future<void> warnUser(String userId, String reason) =>
+      run('warn-user-$userId', () {
+        final profile = state.store.profiles[userId];
+        if (profile == null || userId == state.userId || reason.trim().isEmpty) {
+          throw const RepositoryFailure(
+            RepositoryFault.denied,
+            'Chọn người dùng hợp lệ và nhập lý do cảnh cáo.',
+          );
+        }
+        profile.warned = !profile.warned;
+        profile.warningNote = reason.trim();
+        if (profile.warned) {
+          profile.trustScore = (profile.trustScore - 15).clamp(0, 100);
+          state.store.workspace(profile.user).notifications.add(
+            AppNotification(
+              id: 'warn-$userId-${DateTime.now().millisecondsSinceEpoch}',
+              title: 'Cảnh báo từ Quản trị viên',
+              description: reason.trim(),
+            ),
+          );
+        }
+        state.store.auditLogs.insert(
+          0,
+          AuditLogRecord(
+            id: 'audit-${state.store.auditLogs.length + 1}',
+            actorName: state.fullName,
+            action: profile.warned ? 'CẢNH CÁO NGƯỜI DÙNG' : 'GỠ CẢNH CÁO',
+            target: '${profile.user.email} • ${reason.trim()}',
+          ),
+        );
+      }, role: UserRole.admin);
+
+  Future<void> toggleUserVerification(
+    String userId,
+    bool verified,
+    String note,
+  ) => run('verify-user-$userId', () {
+    final profile = state.store.profiles[userId];
+    if (profile == null) {
+      throw const RepositoryFailure(
+        RepositoryFault.missing,
+        'Không tìm thấy tài khoản.',
+      );
+    }
+    final workspace = state.store.workspace(profile.user);
+    workspace.verification = verified ? 'Đã xác minh' : 'Chưa xác minh';
+    profile.trustScore = (profile.trustScore + (verified ? 15 : -15)).clamp(
+      0,
+      100,
+    );
+    workspace.notifications.add(
+      AppNotification(
+        id: 'admin-verify-$userId-${DateTime.now().millisecondsSinceEpoch}',
+        title: verified
+            ? 'Tài khoản đã được cấp tích xanh xác minh'
+            : 'Trạng thái xác minh đã được thu hồi',
+        description: note.trim().isEmpty
+            ? 'Cập nhật trực tiếp bởi Quản trị viên (+Điểm uy tín).'
+            : note.trim(),
+        verification: true,
+      ),
+    );
+    state.store.auditLogs.insert(
+      0,
+      AuditLogRecord(
+        id: 'audit-${state.store.auditLogs.length + 1}',
+        actorName: state.fullName,
+        action: verified ? 'CẤP TÍCH XANH XÁC MINH' : 'THU HỒI XÁC MINH',
+        target: profile.user.email,
+      ),
+    );
+  }, role: UserRole.admin);
+
+  Future<void> adminResetPassword(String userId) =>
+      run('reset-pw-$userId', () {
+        final profile = state.store.profiles[userId];
+        if (profile == null) {
+          throw const RepositoryFailure(
+            RepositoryFault.missing,
+            'Không tìm thấy tài khoản.',
+          );
+        }
+        state.store.workspace(profile.user).notifications.add(
+          AppNotification(
+            id: 'pw-reset-$userId-${DateTime.now().millisecondsSinceEpoch}',
+            title: 'Yêu cầu đặt lại mật khẩu từ Quản trị viên',
+            description:
+                'Liên kết đặt lại mật khẩu đã được gửi tới ${profile.user.email}.',
+          ),
+        );
+        state.store.auditLogs.insert(
+          0,
+          AuditLogRecord(
+            id: 'audit-${state.store.auditLogs.length + 1}',
+            actorName: state.fullName,
+            action: 'RESET MẬT KHẨU',
+            target: profile.user.email,
+          ),
+        );
+      }, role: UserRole.admin);
+
+  Future<void> notifyUser(String userId, String title, String content) =>
+      run('notify-$userId', () {
+        final profile = state.store.profiles[userId];
+        if (profile == null ||
+            title.trim().isEmpty ||
+            content.trim().isEmpty) {
+          throw const RepositoryFailure(
+            RepositoryFault.server,
+            'Nhập tiêu đề và nội dung thông báo.',
+          );
+        }
+        state.store.workspace(profile.user).notifications.add(
+          AppNotification(
+            id: 'admin-msg-$userId-${DateTime.now().millisecondsSinceEpoch}',
+            title: title.trim(),
+            description: content.trim(),
+          ),
+        );
+        state.store.auditLogs.insert(
+          0,
+          AuditLogRecord(
+            id: 'audit-${state.store.auditLogs.length + 1}',
+            actorName: state.fullName,
+            action: 'GỬI THÔNG BÁO TRỰC TIẾP',
+            target: '${profile.user.email} • ${title.trim()}',
+          ),
+        );
+      }, role: UserRole.admin);
+
+  Future<void> adminSavePlan(ServicePlan plan) =>
+      run('save-plan-${plan.id}', () {
+        if (plan.name.trim().isEmpty ||
+            plan.monthly <= 0 ||
+            plan.description.trim().isEmpty) {
+          throw const RepositoryFailure(
+            RepositoryFault.server,
+            'Nhập tên gói, giá tháng (> 0đ) và mô tả quyền lợi.',
+          );
+        }
+        final idx = state.store.plans.indexWhere((p) => p.id == plan.id);
+        final isNew = idx < 0;
+        if (isNew) {
+          state.store.plans.add(plan);
+        } else {
+          state.store.plans[idx] = plan;
+        }
+        for (final profile in state.store.profiles.values) {
+          if (profile.user.role ==
+              (plan.landlord ? UserRole.landlord : UserRole.tenant)) {
+            state.store.workspace(profile.user).notifications.add(
+              AppNotification(
+                id: 'plan-${plan.id}-${DateTime.now().millisecondsSinceEpoch}',
+                title: isNew
+                    ? 'Ra mắt gói dịch vụ mới: ${plan.name}'
+                    : 'Cập nhật gói dịch vụ: ${plan.name}',
+                description: plan.description,
+              ),
+            );
+          }
+        }
+        state.store.auditLogs.insert(
+          0,
+          AuditLogRecord(
+            id: 'audit-${state.store.auditLogs.length + 1}',
+            actorName: state.fullName,
+            action: isNew ? 'TẠO GÓI DỊCH VỤ' : 'CẬP NHẬT GÓI DỊCH VỤ',
+            target: '${plan.name} (${plan.monthly}đ/tháng)',
+          ),
+        );
+      }, role: UserRole.admin);
+
+  Future<void> adminDeletePlan(String planId) =>
+      run('delete-plan-$planId', () {
+        final plan = state.store.plans.where((p) => p.id == planId).firstOrNull;
+        if (plan == null) {
+          throw const RepositoryFailure(
+            RepositoryFault.missing,
+            'Không tìm thấy gói dịch vụ.',
+          );
+        }
+        state.store.plans.removeWhere((p) => p.id == planId);
+        state.store.auditLogs.insert(
+          0,
+          AuditLogRecord(
+            id: 'audit-${state.store.auditLogs.length + 1}',
+            actorName: state.fullName,
+            action: 'XÓA GÓI DỊCH VỤ',
+            target: plan.name,
+          ),
+        );
+      }, role: UserRole.admin);
+
+  Future<void> resolveDispute(
+    String reviewId,
+    bool upholdDispute,
+    String note,
+  ) => run('resolve-dispute-$reviewId', () {
+    final record = state.store.reviewRecords
+        .where((r) => r.id == reviewId)
+        .firstOrNull;
+    if (record == null || note.trim().isEmpty) {
+      throw const RepositoryFailure(
+        RepositoryFault.server,
+        'Nhập ghi chú kết luận giải quyết khiếu nại.',
+      );
+    }
+    record.disputeStatus = upholdDispute ? 'Đã chấp nhận' : 'Đã bác bỏ';
+    record.disputeResolutionNote = note.trim();
+    state.store.auditLogs.insert(
+      0,
+      AuditLogRecord(
+        id: 'audit-${state.store.auditLogs.length + 1}',
+        actorName: state.fullName,
+        action: upholdDispute ? 'CHẤP NHẬN KHIẾU NẠI REVIEW' : 'BÁC BỎ KHIẾU NẠI REVIEW',
+        target: '${record.id} • ${note.trim()}',
+      ),
+    );
+  }, role: UserRole.admin);
+
+  Future<void> deleteSystemFeedback(String feedbackId) =>
+      run('delete-feedback-$feedbackId', () {
+        state.store.systemFeedbacks.removeWhere((f) => f.id == feedbackId);
+      }, role: UserRole.admin);
 }

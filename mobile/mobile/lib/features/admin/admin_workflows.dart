@@ -7,96 +7,411 @@ import '../../core/flow_page.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../domain/models.dart';
+import '../../domain/workflow_models.dart';
 import '../account/account_screens.dart';
 import '../rooms/room_screens.dart';
 
-class AdminScreen extends StatelessWidget {
+class AdminScreen extends StatefulWidget {
   final AppState state;
   const AdminScreen({super.key, required this.state});
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: state,
-    builder: (context, _) => ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      children: [
-        Header(
-          admin: true,
-          unreadNotifications: state.unreadNotifications,
-          onMap: () => openPage(context, AdminUsersScreen(state: state)),
-          onNotifications: () =>
-              openPage(context, NotificationsScreen(state: state)),
-        ),
-        const PageHeading('Quản trị viên', 'Tổng quan hệ thống Phòng Trọ Xanh'),
-        LayoutBuilder(
-          builder: (context, c) => Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final stat in [
-                ('Người dùng', state.store.profiles.length),
-                ('Phòng trọ', state.rooms.length),
-                (
-                  'Báo cáo chờ xử lý',
-                  state.store.reports
-                      .where((r) => r.status == 'Chờ xử lý')
-                      .length,
-                ),
-                (
-                  'CCCD chờ duyệt',
-                  state.store.kyc.where((k) => k.status == 'Chờ duyệt').length,
-                ),
-              ])
-                SizedBox(
-                  width: (c.maxWidth - 10) / 2,
-                  child: flowCard(stat.$1, [
-                    Text(
-                      '${stat.$2}',
-                      style: PT.title(32).copyWith(color: PT.green),
+  State<AdminScreen> createState() => _AdminScreenState();
+}
+
+class _AdminScreenState extends State<AdminScreen> {
+  int analyticsTab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    return ListenableBuilder(
+      listenable: state,
+      builder: (context, _) {
+        final paidOrders = state.store.orders
+            .where((o) => o.status == 'Thành công')
+            .toList();
+        final orderRevenue = paidOrders.fold<int>(0, (s, o) => s + o.amount);
+        final totalRevenue = 14850000 + orderRevenue;
+        final vipCount = state.store.profiles.values
+            .where((p) => p.package != 'Miễn phí')
+            .length;
+        final boostedRooms = state.rooms.where((r) => r.isBoosted).length;
+        final feedbacks = state.store.systemFeedbacks;
+        final avgSatisfaction = feedbacks.isEmpty
+            ? '4.8'
+            : (feedbacks.map((f) => f.rating).reduce((a, b) => a + b) /
+                      feedbacks.length)
+                  .toStringAsFixed(1);
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          children: [
+            Header(
+              admin: true,
+              unreadNotifications: state.unreadNotifications,
+              onMap: () => openPage(context, AdminUsersScreen(state: state)),
+              onNotifications: () =>
+                  openPage(context, NotificationsScreen(state: state)),
+            ),
+            const PageHeading(
+              'Quản trị viên',
+              'Tổng quan hệ thống Phòng Trọ Xanh',
+            ),
+            LayoutBuilder(
+              builder: (context, c) => Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final stat in [
+                    (
+                      'Người dùng',
+                      state.store.profiles.length,
+                      '+12% tháng này',
                     ),
-                  ]),
+                    (
+                      'Phòng trọ',
+                      state.rooms.length,
+                      '${state.rooms.where((r) => r.status == RoomStatus.available).length} đang mở',
+                    ),
+                    (
+                      'Báo cáo chờ xử lý',
+                      state.store.reports
+                          .where((r) => r.status == 'Chờ xử lý')
+                          .length,
+                      'Ưu tiên kiểm duyệt',
+                    ),
+                    (
+                      'CCCD chờ duyệt',
+                      state.store.kyc
+                          .where((k) => k.status == 'Chờ duyệt')
+                          .length,
+                      'Hàng đợi eKYC',
+                    ),
+                  ])
+                    SizedBox(
+                      width: (c.maxWidth - 10) / 2,
+                      child: flowCard(stat.$1, [
+                        Text(
+                          '${stat.$2}',
+                          style: PT.title(32).copyWith(color: PT.green),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(stat.$3, style: PT.body(11, PT.muted)),
+                      ]),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: PT.card(color: PT.mint),
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 8,
+                alignment: WrapAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Doanh thu hệ thống', style: PT.body(12, PT.muted)),
+                      Text(
+                        '${(totalRevenue / 1000000).toStringAsFixed(2)}tr đ',
+                        style: PT.title(22).copyWith(color: PT.green),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Thành viên VIP', style: PT.body(12, PT.muted)),
+                      Text('$vipCount tài khoản', style: PT.title(18)),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Tin đẩy nổi bật', style: PT.body(12, PT.muted)),
+                      Text('$boostedRooms phòng', style: PT.title(18)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (var i = 0; i < 3; i++)
+                  ChoiceChip(
+                    label: Text(
+                      [
+                        'Tổng quan hệ thống',
+                        'Người thuê & Ghép đôi',
+                        'Chủ trọ & Nguồn cung',
+                      ][i],
+                    ),
+                    selected: analyticsTab == i,
+                    onSelected: (_) => setState(() => analyticsTab = i),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (analyticsTab == 0) ...[
+              flowCard('Tăng trưởng hệ thống 6 tháng', [
+                Text(
+                  'Số lượng người dùng mới & tin đăng phòng theo tháng',
+                  style: PT.body(12, PT.muted),
                 ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 110,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (final m in const [
+                        ('T5', 0.45, 0.35),
+                        ('T6', 0.55, 0.48),
+                        ('T7', 0.64, 0.52),
+                        ('T8', 0.76, 0.68),
+                        ('T9', 0.88, 0.78),
+                        ('T10', 1.0, 0.92),
+                      ])
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Flexible(
+                                        child: FractionallySizedBox(
+                                          heightFactor: m.$2,
+                                          child: Container(
+                                            width: 8,
+                                            decoration: BoxDecoration(
+                                              color: PT.green,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Flexible(
+                                        child: FractionallySizedBox(
+                                          heightFactor: m.$3,
+                                          child: Container(
+                                            width: 8,
+                                            decoration: BoxDecoration(
+                                              color: PT.amber,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(m.$1, style: PT.body(10, PT.muted)),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ]),
+              flowCard('Mức độ hài lòng hệ thống ($avgSatisfaction/5 ★)', [
+                for (final star in [
+                  (5, 0.72),
+                  (4, 0.18),
+                  (3, 0.06),
+                  (2, 0.03),
+                  (1, 0.01),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 36,
+                          child: Text('${star.$1} ★', style: PT.body(12)),
+                        ),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: star.$2,
+                              minHeight: 7,
+                              color: PT.green,
+                              backgroundColor: PT.mint,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const Divider(height: 18),
+                for (final fb in feedbacks)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: PT.card(color: PT.mint),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                '${fb.authorName} (${fb.roleLabel}) • ${fb.rating}★',
+                                style: PT.title(14),
+                              ),
+                              InkWell(
+                                onTap: () => state.workflows
+                                    .deleteSystemFeedback(fb.id),
+                                child: Text(
+                                  'Xóa phản hồi',
+                                  style: PT.body(11, PT.error),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(fb.comment, style: PT.body(13)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ]),
             ],
-          ),
-        ),
-        MenuRow(
-          icon: LucideIcons.fileCheck,
-          title: 'Duyệt CCCD',
-          subtitle: 'Hồ sơ và kết quả theo submission ID',
-          onTap: () => openPage(context, AdminQueueScreen(state: state)),
-        ),
-        MenuRow(
-          icon: LucideIcons.house,
-          title: 'Duyệt tin phòng',
-          subtitle:
-              '${state.rooms.where((r) => r.status == RoomStatus.pending).length} tin chờ duyệt',
-          onTap: () => openPage(context, AdminRoomsScreen(state: state)),
-        ),
-        MenuRow(
-          icon: LucideIcons.flag,
-          title: 'Báo cáo vi phạm',
-          subtitle: 'Nội dung, xử lý và lịch sử',
-          onTap: () => openPage(context, AdminReportsScreen(state: state)),
-        ),
-        MenuRow(
-          icon: LucideIcons.users,
-          title: 'Quản lý người dùng',
-          subtitle: 'Tra cứu, khóa / mở khóa',
-          onTap: () => openPage(context, AdminUsersScreen(state: state)),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Số liệu lấy từ kho demo đang dùng chung, cập nhật khi xử lý. Chưa có dữ liệu hoạt động thật để vẽ biểu đồ.',
-          style: PT.body(13, PT.muted),
-        ),
-        const SizedBox(height: 16),
-        PrimaryButton(
-          'Đăng xuất',
-          outline: true,
-          onTap: () => AppScope.maybeOf(context)?.logout(),
-        ),
-      ],
-    ),
-  );
+            if (analyticsTab == 1) ...[
+              flowCard('Phân bổ điểm tin cậy TrustScore', [
+                for (final tier in const [
+                  ('Xuất sắc (90 - 100)', 0.54, '54%'),
+                  ('Tốt (75 - 89)', 0.31, '31%'),
+                  ('Trung bình (60 - 74)', 0.11, '11%'),
+                  ('Cần lưu ý (< 60)', 0.04, '4%'),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          children: [
+                            Text(tier.$1, style: PT.body(13)),
+                            const SizedBox(width: 8),
+                            Text(tier.$3, style: PT.title(14)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        LinearProgressIndicator(
+                          value: tier.$2,
+                          minHeight: 7,
+                          color: PT.green,
+                          backgroundColor: PT.mint,
+                        ),
+                      ],
+                    ),
+                  ),
+                const Divider(height: 16),
+                Text(
+                  'Hiệu suất ghép đôi ở ghép: 87% tương thích • Tỷ lệ xác minh eKYC: 92%',
+                  style: PT.body(13, PT.green),
+                ),
+              ]),
+            ],
+            if (analyticsTab == 2) ...[
+              flowCard('Nguồn cung phòng & Tỷ lệ lấp đầy', [
+                Text(
+                  'Tỷ lệ lấp đầy toàn hệ thống: 84%',
+                  style: PT.title(17).copyWith(color: PT.green),
+                ),
+                const SizedBox(height: 8),
+                const LinearProgressIndicator(
+                  value: 0.84,
+                  minHeight: 8,
+                  color: PT.green,
+                  backgroundColor: PT.mint,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Phân bổ theo khu vực: Quận 10 (42%) • Thủ Đức (35%) • Quận 3 (23%)',
+                  style: PT.body(13),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Phân bổ loại hình: Studio (48%) • Phòng trọ (32%) • Căn hộ mini (20%)',
+                  style: PT.body(13, PT.muted),
+                ),
+              ]),
+            ],
+            MenuRow(
+              icon: LucideIcons.fileCheck,
+              title: 'Duyệt CCCD',
+              subtitle: 'Hồ sơ và kết quả theo submission ID',
+              onTap: () => openPage(context, AdminQueueScreen(state: state)),
+            ),
+            MenuRow(
+              icon: LucideIcons.house,
+              title: 'Duyệt tin phòng',
+              subtitle:
+                  '${state.rooms.where((r) => r.status == RoomStatus.pending).length} tin chờ duyệt',
+              onTap: () => openPage(context, AdminRoomsScreen(state: state)),
+            ),
+            MenuRow(
+              icon: LucideIcons.flag,
+              title: 'Báo cáo vi phạm',
+              subtitle: 'Nội dung, xử lý và lịch sử',
+              onTap: () => openPage(context, AdminReportsScreen(state: state)),
+            ),
+            MenuRow(
+              icon: LucideIcons.users,
+              title: 'Quản lý người dùng',
+              subtitle: 'Tra cứu, khóa / mở khóa',
+              onTap: () => openPage(context, AdminUsersScreen(state: state)),
+            ),
+            MenuRow(
+              icon: LucideIcons.package,
+              title: 'Quản lý gói dịch vụ',
+              subtitle: '${state.store.plans.length} gói cước & bảng giá VIP',
+              onTap: () => openPage(context, AdminPackagesScreen(state: state)),
+            ),
+            MenuRow(
+              icon: LucideIcons.scale,
+              title: 'Khiếu nại & Nhật ký hệ thống',
+              subtitle: 'Giải quyết tranh chấp đánh giá & giao dịch',
+              onTap: () => openPage(context, AdminDisputesScreen(state: state)),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Số liệu lấy từ kho demo đang dùng chung, cập nhật trực tiếp khi xử lý.',
+              style: PT.body(13, PT.muted),
+            ),
+            const SizedBox(height: 16),
+            PrimaryButton(
+              'Đăng xuất',
+              outline: true,
+              onTap: () => AppScope.maybeOf(context)?.logout(),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class AdminQueueScreen extends StatefulWidget {
@@ -108,15 +423,39 @@ class AdminQueueScreen extends StatefulWidget {
 
 class _AdminQueueScreenState extends State<AdminQueueScreen> {
   String filter = 'Chờ duyệt';
+  String roleFilter = 'Tất cả vai trò';
+  String query = '';
+
   @override
   Widget build(BuildContext context) => FlowPage(
     state: widget.state,
     title: 'Duyệt CCCD',
     content: (ctx, f) {
-      final items = widget.state.store.kyc
-          .where((k) => filter == 'Tất cả' || k.status == filter)
-          .toList();
+      final s = widget.state;
+      final items = s.store.kyc.where((k) {
+        final statusOk = filter == 'Tất cả' || k.status == filter;
+        final userRole = s.store.profiles[k.userId]?.user.role;
+        final roleOk =
+            roleFilter == 'Tất cả vai trò' ||
+            (roleFilter == 'Người thuê' && userRole == UserRole.tenant) ||
+            (roleFilter == 'Chủ trọ' && userRole == UserRole.landlord);
+        final name = s.store.workspaceById(k.userId).fullName.toLowerCase();
+        final queryOk =
+            query.isEmpty ||
+            name.contains(query.toLowerCase()) ||
+            k.number.contains(query) ||
+            k.id.toLowerCase().contains(query.toLowerCase());
+        return statusOk && roleOk && queryOk;
+      }).toList();
       return [
+        TextField(
+          decoration: const InputDecoration(
+            labelText: 'Tìm theo tên, số CCCD hoặc mã hồ sơ',
+            prefixIcon: Icon(LucideIcons.search),
+          ),
+          onChanged: (v) => setState(() => query = v),
+        ),
+        const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -130,6 +469,20 @@ class _AdminQueueScreenState extends State<AdminQueueScreen> {
               )
               .toList(),
         ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: ['Tất cả vai trò', 'Người thuê', 'Chủ trọ']
+              .map(
+                (v) => ChoiceChip(
+                  label: Text(v),
+                  selected: v == roleFilter,
+                  onSelected: (_) => setState(() => roleFilter = v),
+                ),
+              )
+              .toList(),
+        ),
         const SizedBox(height: 16),
         if (items.isEmpty)
           const EmptyState(
@@ -139,11 +492,11 @@ class _AdminQueueScreenState extends State<AdminQueueScreen> {
         for (final k in items.reversed)
           MenuRow(
             icon: LucideIcons.fileCheck,
-            title: widget.state.store.workspaceById(k.userId).fullName,
-            subtitle: '${k.id} • ${k.status}',
+            title: s.store.workspaceById(k.userId).fullName,
+            subtitle: '${k.id} • CCCD ${k.number} • ${k.status}',
             onTap: () => openPage(
               ctx,
-              AdminDecisionScreen(state: widget.state, kind: 'kyc', id: k.id),
+              AdminDecisionScreen(state: s, kind: 'kyc', id: k.id),
             ),
           ),
       ];
@@ -160,6 +513,8 @@ class AdminReportsScreen extends StatefulWidget {
 
 class _AdminReportsScreenState extends State<AdminReportsScreen> {
   String filter = 'Chờ xử lý';
+  String severityFilter = 'Mọi mức độ';
+
   @override
   Widget build(BuildContext context) {
     final s = widget.state ?? AppScope.maybeOf(context)!.state;
@@ -167,9 +522,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       state: s,
       title: 'Báo cáo vi phạm',
       content: (ctx, f) {
-        final items = s.store.reports
-            .where((r) => filter == 'Tất cả' || r.status == filter)
-            .toList();
+        final items = s.store.reports.where((r) {
+          final statusOk = filter == 'Tất cả' || r.status == filter;
+          final sevOk =
+              severityFilter == 'Mọi mức độ' || r.severity == severityFilter;
+          return statusOk && sevOk;
+        }).toList();
         return [
           Wrap(
             spacing: 8,
@@ -184,6 +542,20 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 )
                 .toList(),
           ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ['Mọi mức độ', 'Nghiêm trọng', 'Trung bình', 'Thấp']
+                .map(
+                  (v) => ChoiceChip(
+                    label: Text(v),
+                    selected: v == severityFilter,
+                    onSelected: (_) => setState(() => severityFilter = v),
+                  ),
+                )
+                .toList(),
+          ),
           const SizedBox(height: 16),
           if (items.isEmpty)
             const EmptyState(
@@ -194,7 +566,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
             MenuRow(
               icon: LucideIcons.flag,
               title: r.reason,
-              subtitle: '${r.id} • ${r.targetType} ${r.targetId} • ${r.status}',
+              subtitle:
+                  '${r.id} • [${r.severity}] • ${r.targetType} ${r.targetId} • ${r.status}',
               onTap: () => openPage(
                 ctx,
                 AdminDecisionScreen(state: s, kind: 'report', id: r.id),
@@ -214,7 +587,7 @@ class AdminUsersScreen extends StatefulWidget {
 }
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
-  String query = '', filter = 'Tất cả';
+  String query = '', filter = 'Tất cả', roleFilter = 'Mọi vai trò';
   @override
   Widget build(BuildContext context) {
     final s = widget.state ?? AppScope.maybeOf(context)!.state;
@@ -222,18 +595,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       state: s,
       title: 'Người dùng',
       content: (ctx, f) {
-        final items = s.store.profiles.values
-            .where(
-              (p) =>
-                  !s.store.deleted.contains(p.user.id) &&
-                  '${s.store.workspace(p.user).fullName} ${p.user.email} ${p.user.phone}'
-                      .toLowerCase()
-                      .contains(query.toLowerCase()) &&
-                  (filter == 'Tất cả' ||
-                      (filter == 'Đã khóa') ==
-                          s.store.blocked.contains(p.user.id)),
-            )
-            .toList();
+        final items = s.store.profiles.values.where((p) {
+          if (s.store.deleted.contains(p.user.id)) return false;
+          final textMatch =
+              '${s.store.workspace(p.user).fullName} ${p.user.email} ${p.user.phone}'
+                  .toLowerCase()
+                  .contains(query.toLowerCase());
+          final isBlocked = s.store.blocked.contains(p.user.id);
+          final statusMatch = switch (filter) {
+            'Đã khóa' => isBlocked,
+            'Hoạt động' => !isBlocked,
+            'Đã cảnh cáo' => p.warned,
+            _ => true,
+          };
+          final roleMatch =
+              roleFilter == 'Mọi vai trò' || p.user.role.name == roleFilter;
+          return textMatch && statusMatch && roleMatch;
+        }).toList();
         return [
           TextField(
             decoration: const InputDecoration(
@@ -245,12 +623,32 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
-            children: ['Tất cả', 'Hoạt động', 'Đã khóa']
+            runSpacing: 8,
+            children: ['Tất cả', 'Hoạt động', 'Đã khóa', 'Đã cảnh cáo']
                 .map(
                   (v) => ChoiceChip(
                     label: Text(v),
                     selected: v == filter,
                     onSelected: (_) => setState(() => filter = v),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ('Mọi vai trò', 'Mọi vai trò'),
+              ('tenant', 'Người thuê'),
+              ('landlord', 'Chủ trọ'),
+              ('admin', 'Quản trị'),
+            ]
+                .map(
+                  (v) => ChoiceChip(
+                    label: Text(v.$2),
+                    selected: v.$1 == roleFilter,
+                    onSelected: (_) => setState(() => roleFilter = v.$1),
                   ),
                 )
                 .toList(),
@@ -266,7 +664,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               icon: LucideIcons.user,
               title: s.store.workspace(p.user).fullName,
               subtitle:
-                  '${p.user.email} • ${p.user.role.name} • ${s.store.blocked.contains(p.user.id) ? 'Đã khóa' : 'Hoạt động'}',
+                  '${p.user.email} • ${p.user.role.name} • Trust ${p.trustScore} • ${s.store.blocked.contains(p.user.id) ? 'Đã khóa' : p.warned ? 'Đã cảnh cáo' : 'Hoạt động'}',
               onTap: () => openPage(
                 ctx,
                 AdminDecisionScreen(state: s, kind: 'user', id: p.user.id),
@@ -320,7 +718,50 @@ class _AdminDecisionScreenState extends State<AdminDecisionScreen> {
           flowCard(s.store.workspaceById(k.userId).fullName, [
             Text('${k.id} • ${k.status}'),
             Text('Số CCCD: ${k.number}'),
-            Text(k.note),
+            if (k.note.isNotEmpty) Text(k.note),
+            TextButton.icon(
+              icon: const Icon(LucideIcons.zoomIn, size: 16),
+              onPressed: () => showDialog<void>(
+                context: ctx,
+                builder: (d) => AlertDialog(
+                  title: Text('Đối chiếu CCCD • ${k.number}'),
+                  content: SizedBox(
+                    width: 300,
+                    height: 320,
+                    child: InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 4.0,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            VerificationDocument(
+                              state: s,
+                              userId: k.userId,
+                              reference: k.front,
+                              side: 'Mặt trước (Zoom)',
+                            ),
+                            const SizedBox(height: 12),
+                            VerificationDocument(
+                              state: s,
+                              userId: k.userId,
+                              reference: k.back,
+                              side: 'Mặt sau (Zoom)',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(d),
+                      child: const Text('Đóng'),
+                    ),
+                  ],
+                ),
+              ),
+              label: const Text('Phóng to đối chiếu ảnh CCCD'),
+            ),
           ]),
           VerificationDocument(
             state: s,
@@ -377,9 +818,17 @@ class _AdminDecisionScreenState extends State<AdminDecisionScreen> {
         return [
           flowCard('${r.id} • ${r.status}', [
             Text(r.reason, style: PT.title(22)),
+            const SizedBox(height: 6),
+            Pill(
+              'Mức độ: ${r.severity}',
+              color: r.severity == 'Nghiêm trọng' ? PT.error : PT.amber,
+            ),
+            const SizedBox(height: 8),
             Text(r.details),
             Text('Đối tượng: ${r.targetType} ${r.targetId}'),
             Text('Người gửi: ${s.store.workspaceById(r.reporterId).fullName}'),
+            if (r.evidence.isNotEmpty)
+              Text('Bằng chứng: ${r.evidence.join(', ')}'),
             ...r.history.map(Text.new),
           ]),
           if (r.status == 'Chờ xử lý') ...[
@@ -451,6 +900,8 @@ class _AdminDecisionScreenState extends State<AdminDecisionScreen> {
         ];
       }
       final blocked = s.store.blocked.contains(widget.id);
+      final verified =
+          s.store.workspace(p.user).verification == 'Đã xác minh';
       return [
         flowCard(s.store.workspace(p.user).fullName, [
           Text(p.user.email),
@@ -458,6 +909,12 @@ class _AdminDecisionScreenState extends State<AdminDecisionScreen> {
           Text('Vai trò: ${p.user.role.name}'),
           Text(blocked ? 'Đã khóa' : 'Hoạt động'),
           Text('Xác minh: ${s.store.workspace(p.user).verification}'),
+          Text('TrustScore: ${p.trustScore}/100 • Gói: ${p.package}'),
+          if (p.warned && p.warningNote.isNotEmpty)
+            Text(
+              'Cảnh cáo gần nhất: ${p.warningNote}',
+              style: PT.body(13, PT.error),
+            ),
         ]),
         if (p.user.id != s.userId) ...[
           TextField(
@@ -489,55 +946,561 @@ class _AdminDecisionScreenState extends State<AdminDecisionScreen> {
                     }
                   },
           ),
+          const SizedBox(height: 12),
+          PrimaryButton(
+            'Cảnh cáo người dùng',
+            outline: true,
+            busy: f.busy,
+            onTap: f.busy
+                ? null
+                : () => f.perform(
+                    () => s.workflows.warnUser(
+                      p.user.id,
+                      note.text.trim().isEmpty
+                          ? 'Nhắc nhở tuân thủ quy tắc cộng đồng'
+                          : note.text,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          PrimaryButton(
+            verified ? 'Thu hồi xác minh CCCD' : 'Cấp tích xanh xác minh',
+            outline: true,
+            busy: f.busy,
+            onTap: f.busy
+                ? null
+                : () => f.perform(
+                    () => s.workflows.toggleUserVerification(
+                      p.user.id,
+                      !verified,
+                      note.text,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          PrimaryButton(
+            'Đặt lại mật khẩu mặc định',
+            outline: true,
+            busy: f.busy,
+            onTap: f.busy
+                ? null
+                : () => f.perform(
+                    () => s.workflows.adminResetPassword(p.user.id),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          PrimaryButton(
+            'Gửi thông báo trực tiếp',
+            outline: true,
+            busy: f.busy,
+            onTap: f.busy
+                ? null
+                : () async {
+                    final titleCtrl = TextEditingController(
+                      text: 'Thông báo từ Quản trị viên',
+                    );
+                    final bodyCtrl = TextEditingController(
+                      text: note.text.trim().isEmpty
+                          ? 'Vui lòng cập nhật đầy đủ thông tin tài khoản.'
+                          : note.text,
+                    );
+                    final send = await showDialog<bool>(
+                      context: ctx,
+                      builder: (d) => AlertDialog(
+                        title: const Text('Gửi thông báo trực tiếp'),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextField(
+                                controller: titleCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Tiêu đề',
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: bodyCtrl,
+                                maxLines: 3,
+                                decoration: const InputDecoration(
+                                  labelText: 'Nội dung',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(d, false),
+                            child: const Text('Hủy'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(d, true),
+                            child: const Text('Gửi'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (send == true) {
+                      await f.perform(
+                        () => s.workflows.notifyUser(
+                          p.user.id,
+                          titleCtrl.text,
+                          bodyCtrl.text,
+                        ),
+                      );
+                    }
+                  },
+          ),
         ],
       ];
     },
   );
 }
 
-class AdminRoomsScreen extends StatelessWidget {
+class AdminRoomsScreen extends StatefulWidget {
   final AppState state;
   const AdminRoomsScreen({super.key, required this.state});
   @override
-  Widget build(BuildContext context) => FlowPage(
-    state: state,
-    title: 'Duyệt tin phòng',
-    content: (ctx, f) => [
-      if (!state.rooms.any((r) => r.status == RoomStatus.pending))
-        const EmptyState(
-          'Không có tin chờ duyệt',
-          'Tin mới / tin sửa của chủ trọ sẽ xuất hiện ở đây.',
-        ),
-      for (final r in state.rooms.where((r) => r.status == RoomStatus.pending))
-        flowCard(r.title, [
-          Text(r.address),
-          Text('${r.price}đ/tháng • ${r.area}m² • Tầng ${r.floor}'),
-          Text(r.landlordName),
-          Text(r.description),
-          const SizedBox(height: 12),
-          PrimaryButton(
-            'Xem chi tiết tin',
-            outline: true,
-            onTap: () => openPage(ctx, RoomDetailScreen(state: state, room: r)),
-          ),
-          const SizedBox(height: 12),
-          PrimaryButton(
-            'Duyệt tin phòng',
-            busy: f.busy,
-            onTap: f.busy
-                ? null
-                : () =>
-                      f.perform(() => state.workflows.moderateRoom(r.id, true)),
-          ),
-          TextButton(
-            onPressed: f.busy
-                ? null
-                : () => f.perform(
-                    () => state.workflows.moderateRoom(r.id, false),
+  State<AdminRoomsScreen> createState() => _AdminRoomsScreenState();
+}
+
+class _AdminRoomsScreenState extends State<AdminRoomsScreen> {
+  String filter = 'Chờ duyệt';
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    return FlowPage(
+      state: state,
+      title: 'Duyệt tin phòng',
+      content: (ctx, f) {
+        final items = state.rooms.where((r) {
+          if (filter == 'Chờ duyệt') return r.status == RoomStatus.pending;
+          if (filter == 'Đang hiển thị') return r.status == RoomStatus.available;
+          if (filter == 'Đã ẩn') return r.status == RoomStatus.hidden;
+          return true;
+        }).toList();
+
+        return [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ['Chờ duyệt', 'Đang hiển thị', 'Đã ẩn', 'Tất cả']
+                .map(
+                  (v) => ChoiceChip(
+                    label: Text(v),
+                    selected: filter == v,
+                    onSelected: (_) => setState(() => filter = v),
                   ),
-            child: const Text('Từ chối / ẩn tin'),
+                )
+                .toList(),
           ),
-        ]),
-    ],
-  );
+          const SizedBox(height: 14),
+          if (items.isEmpty)
+            const EmptyState(
+              'Không có tin chờ duyệt',
+              'Tin mới / tin sửa của chủ trọ sẽ xuất hiện ở đây.',
+            ),
+          for (final r in items)
+            flowCard(r.title, [
+              Text(r.address),
+              Text('${r.price}đ/tháng • ${r.area}m² • Tầng ${r.floor}'),
+              Text(
+                'Cọc: ${r.depositLabel} • Điện: ${r.electricity} • Nước: ${r.water}',
+                style: PT.body(12, PT.muted),
+              ),
+              Text(r.landlordName),
+              Text(r.description),
+              const SizedBox(height: 12),
+              PrimaryButton(
+                'Xem chi tiết tin',
+                outline: true,
+                onTap: () =>
+                    openPage(ctx, RoomDetailScreen(state: state, room: r)),
+              ),
+              const SizedBox(height: 12),
+              if (r.status != RoomStatus.available)
+                PrimaryButton(
+                  'Duyệt tin phòng',
+                  busy: f.busy,
+                  onTap: f.busy
+                      ? null
+                      : () => f.perform(
+                          () => state.workflows.moderateRoom(r.id, true),
+                        ),
+                ),
+              if (r.status != RoomStatus.hidden)
+                TextButton(
+                  onPressed: f.busy
+                      ? null
+                      : () => f.perform(
+                          () => state.workflows.moderateRoom(r.id, false),
+                        ),
+                  child: const Text('Từ chối / ẩn tin'),
+                ),
+            ]),
+        ];
+      },
+    );
+  }
+}
+
+class AdminPackagesScreen extends StatefulWidget {
+  final AppState state;
+  const AdminPackagesScreen({super.key, required this.state});
+  @override
+  State<AdminPackagesScreen> createState() => _AdminPackagesScreenState();
+}
+
+class _AdminPackagesScreenState extends State<AdminPackagesScreen> {
+  String roleFilter = 'Tất cả';
+
+  Future<void> _openEditor(
+    BuildContext ctx,
+    FlowPageState f, [
+    ServicePlan? existing,
+  ]) async {
+    final idCtrl = TextEditingController(
+      text:
+          existing?.id ??
+          'plan-${DateTime.now().millisecondsSinceEpoch % 10000}',
+    );
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final headlineCtrl = TextEditingController(
+      text: existing?.description ?? '',
+    );
+    final monthlyCtrl = TextEditingController(
+      text: '${existing?.monthly ?? 99000}',
+    );
+    final yearlyCtrl = TextEditingController(
+      text: '${existing?.yearly ?? 990000}',
+    );
+    final featuresCtrl = TextEditingController(
+      text: existing?.features.join(', ') ?? 'Ưu tiên hiển thị, Huy hiệu VIP',
+    );
+    UserRole selectedRole = (existing?.landlord ?? true)
+        ? UserRole.landlord
+        : UserRole.tenant;
+
+    final saved = await showDialog<ServicePlan>(
+      context: ctx,
+      builder: (d) => StatefulBuilder(
+        builder: (d, setModalState) => AlertDialog(
+          title: Text(existing == null ? 'Tạo gói dịch vụ' : 'Chỉnh sửa gói'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (existing == null)
+                  TextField(
+                    controller: idCtrl,
+                    decoration: const InputDecoration(labelText: 'Mã gói (ID)'),
+                  ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Tên gói cước'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<UserRole>(
+                  isExpanded: true,
+                  initialValue: selectedRole,
+                  decoration: const InputDecoration(
+                    labelText: 'Đối tượng áp dụng',
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: UserRole.tenant,
+                      child: Text('Người thuê'),
+                    ),
+                    DropdownMenuItem(
+                      value: UserRole.landlord,
+                      child: Text('Chủ trọ'),
+                    ),
+                  ],
+                  onChanged: (v) => setModalState(() => selectedRole = v!),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: monthlyCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Giá tháng (VNĐ)',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: yearlyCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Giá năm (VNĐ)'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: headlineCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Mô tả ngắn / Quyền lợi chính',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: featuresCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Danh sách tính năng (cách nhau dấu phẩy)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(d),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(
+                d,
+                ServicePlan(
+                  idCtrl.text.trim(),
+                  nameCtrl.text.trim(),
+                  int.tryParse(monthlyCtrl.text) ?? 99000,
+                  headlineCtrl.text.trim().isEmpty
+                      ? 'Quyền lợi nâng cao'
+                      : headlineCtrl.text.trim(),
+                  yearly: int.tryParse(yearlyCtrl.text) ?? 990000,
+                  extraSwipes: existing?.extraSwipes ?? 0,
+                  boosts: existing?.boosts ?? 5,
+                  superMatches: existing?.superMatches ?? 0,
+                  landlord: selectedRole == UserRole.landlord,
+                  features: featuresCtrl.text
+                      .split(',')
+                      .map((e) => e.trim())
+                      .where((e) => e.isNotEmpty)
+                      .toList(),
+                ),
+              ),
+              child: const Text('Lưu gói'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved != null) {
+      await f.perform(() => widget.state.workflows.adminSavePlan(saved));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.state;
+    return FlowPage(
+      state: s,
+      title: 'Quản lý gói dịch vụ',
+      content: (ctx, f) {
+        final plans = s.store.plans.where((p) {
+          if (roleFilter == 'Người thuê') return !p.landlord;
+          if (roleFilter == 'Chủ trọ') return p.landlord;
+          return true;
+        }).toList();
+
+        return [
+          PrimaryButton(
+            'Thêm gói dịch vụ mới',
+            icon: LucideIcons.plus,
+            busy: f.busy,
+            onTap: f.busy ? null : () => _openEditor(ctx, f),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ['Tất cả', 'Người thuê', 'Chủ trọ']
+                .map(
+                  (v) => ChoiceChip(
+                    label: Text(v),
+                    selected: roleFilter == v,
+                    onSelected: (_) => setState(() => roleFilter = v),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 14),
+          for (final plan in plans)
+            flowCard('${plan.name} (${plan.id})', [
+              Pill(
+                plan.landlord ? 'Dành cho Chủ trọ' : 'Dành cho Người thuê',
+                color: PT.green,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Giá tháng: ${plan.monthly}đ${plan.yearly > 0 ? ' • Giá năm: ${plan.yearly}đ' : ''}',
+                style: PT.title(17),
+              ),
+              Text(plan.description),
+              if (plan.features.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                for (final ft in plan.features)
+                  Text('• $ft', style: PT.body(13, PT.muted)),
+              ],
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(LucideIcons.pencil, size: 15),
+                    onPressed: f.busy ? null : () => _openEditor(ctx, f, plan),
+                    label: const Text('Chỉnh sửa'),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(
+                      LucideIcons.trash2,
+                      size: 15,
+                      color: PT.error,
+                    ),
+                    onPressed: f.busy
+                        ? null
+                        : () => f.perform(
+                            () => s.workflows.adminDeletePlan(plan.id),
+                          ),
+                    label: Text('Xóa gói', style: PT.body(13, PT.error)),
+                  ),
+                ],
+              ),
+            ]),
+        ];
+      },
+    );
+  }
+}
+
+class AdminDisputesScreen extends StatefulWidget {
+  final AppState state;
+  const AdminDisputesScreen({super.key, required this.state});
+  @override
+  State<AdminDisputesScreen> createState() => _AdminDisputesScreenState();
+}
+
+class _AdminDisputesScreenState extends State<AdminDisputesScreen> {
+  int tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.state;
+    return FlowPage(
+      state: s,
+      title: 'Khiếu nại & Nhật ký',
+      content: (ctx, f) {
+        final disputedReviews = s.store.reviewRecords
+            .where((r) => r.disputeStatus != null)
+            .toList();
+
+        return [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (var i = 0; i < 3; i++)
+                ChoiceChip(
+                  label: Text(
+                    [
+                      'Khiếu nại đánh giá',
+                      'Giao dịch gói cước',
+                      'Nhật ký bảo mật',
+                    ][i],
+                  ),
+                  selected: tab == i,
+                  onSelected: (_) => setState(() => tab = i),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (tab == 0) ...[
+            if (disputedReviews.isEmpty)
+              const EmptyState(
+                'Không có khiếu nại đánh giá',
+                'Khi chủ trọ khiếu nại đánh giá không đúng sự thật, yêu cầu sẽ hiển thị tại đây.',
+              ),
+            for (final r in disputedReviews)
+              flowCard('Đánh giá ${r.id} • ${r.rating}/5 ★', [
+                Pill('Trạng thái: ${r.disputeStatus}', color: PT.amber),
+                const SizedBox(height: 6),
+                Text('Người viết: ${r.authorName} • Phòng: ${r.targetId}'),
+                Text('Nội dung đánh giá: ${r.comment}'),
+                if (r.disputeReason != null)
+                  Text(
+                    'Lý do chủ trọ khiếu nại: ${r.disputeReason}',
+                    style: PT.body(13, PT.error),
+                  ),
+                if (r.disputeResolutionNote != null)
+                  Text(
+                    'Kết luận Admin: ${r.disputeResolutionNote}',
+                    style: PT.body(13, PT.green),
+                  ),
+                if (r.disputeStatus == 'Chờ xử lý') ...[
+                  const SizedBox(height: 12),
+                  PrimaryButton(
+                    'Gỡ đánh giá vi phạm',
+                    busy: f.busy,
+                    onTap: f.busy
+                        ? null
+                        : () => f.perform(
+                            () => s.workflows.resolveDispute(
+                              r.id,
+                              true,
+                              'Đánh giá vi phạm tiêu chuẩn cộng đồng, đã gỡ.',
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 8),
+                  PrimaryButton(
+                    'Giữ nguyên đánh giá (Bác bỏ khiếu nại)',
+                    outline: true,
+                    busy: f.busy,
+                    onTap: f.busy
+                        ? null
+                        : () => f.perform(
+                            () => s.workflows.resolveDispute(
+                              r.id,
+                              false,
+                              'Đánh giá hợp lệ từ hợp đồng thực tế.',
+                            ),
+                          ),
+                  ),
+                ],
+              ]),
+          ],
+          if (tab == 1) ...[
+            if (s.store.orders.isEmpty)
+              const EmptyState(
+                'Chưa có giao dịch phát sinh',
+                'Giao dịch mua gói VIP hoặc lượt đẩy tin sẽ hiển thị ở đây.',
+              ),
+            for (final o in s.store.orders.reversed)
+              flowCard('${o.plan.name} • ${o.amount}đ', [
+                Text('Mã đơn: ${o.id} • Khách hàng: ${o.userId}'),
+                Text(
+                  'Phương thức: ${o.method} • Chu kỳ: ${o.yearly ? 'Năm' : 'Tháng'}',
+                ),
+                Pill(
+                  o.status,
+                  color: o.status == 'Thành công' ? PT.green : PT.amber,
+                ),
+              ]),
+          ],
+          if (tab == 2) ...[
+            for (final log in s.store.auditLogs)
+              flowCard('${log.action} • ${log.target}', [
+                Text('IP: ${log.ipAddress}'),
+                Text(
+                  'Quản trị viên: ${log.actorName} • Thời gian: ${log.timestamp.toIso8601String().substring(0, 16)}',
+                  style: PT.body(12, PT.muted),
+                ),
+              ]),
+          ],
+        ];
+      },
+    );
+  }
 }
