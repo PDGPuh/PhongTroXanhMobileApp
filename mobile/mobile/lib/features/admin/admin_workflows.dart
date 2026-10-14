@@ -57,6 +57,111 @@ class _AdminScreenState extends State<AdminScreen> {
               'Quản trị viên',
               'Tổng quan hệ thống Phòng Trọ Xanh',
             ),
+            Container(
+              padding: const EdgeInsets.all(18),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [PT.deep, Color(0xFF0A4F48)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x18073B3C),
+                    blurRadius: 20,
+                    offset: Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Pill(
+                        'Trung tâm điều hành Proptech',
+                        dense: true,
+                        color: Colors.white,
+                        bg: Colors.white.withValues(alpha: 0.16),
+                      ),
+                      const Pill(
+                        'Hệ thống ổn định 99.9%',
+                        dense: true,
+                        color: PT.deep,
+                        bg: Color(0xFFA7F3D0),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Doanh thu hệ thống',
+                            style: PT.body(
+                              12,
+                              Colors.white.withValues(alpha: 0.78),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${(totalRevenue / 1000000).toStringAsFixed(2)}tr đ',
+                            style: PT.title(24).copyWith(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Thành viên VIP',
+                            style: PT.body(
+                              12,
+                              Colors.white.withValues(alpha: 0.78),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$vipCount tài khoản',
+                            style: PT.title(18).copyWith(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tin đẩy nổi bật',
+                            style: PT.body(
+                              12,
+                              Colors.white.withValues(alpha: 0.78),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$boostedRooms phòng',
+                            style: PT.title(18).copyWith(
+                              color: const Color(0xFFFDE68A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
             LayoutBuilder(
               builder: (context, c) => Wrap(
                 spacing: 10,
@@ -67,11 +172,17 @@ class _AdminScreenState extends State<AdminScreen> {
                       'Người dùng',
                       state.store.profiles.length,
                       '+12% tháng này',
+                      LucideIcons.users,
+                      PT.green,
+                      PT.mint,
                     ),
                     (
                       'Phòng trọ',
                       state.rooms.length,
                       '${state.rooms.where((r) => r.status == RoomStatus.available).length} đang mở',
+                      LucideIcons.building2,
+                      const Color(0xFF0799DE),
+                      const Color(0xFFEEF8FF),
                     ),
                     (
                       'Báo cáo chờ xử lý',
@@ -79,6 +190,9 @@ class _AdminScreenState extends State<AdminScreen> {
                           .where((r) => r.status == 'Chờ xử lý')
                           .length,
                       'Ưu tiên kiểm duyệt',
+                      LucideIcons.flag,
+                      PT.error,
+                      const Color(0xFFFEF2F2),
                     ),
                     (
                       'CCCD chờ duyệt',
@@ -86,58 +200,53 @@ class _AdminScreenState extends State<AdminScreen> {
                           .where((k) => k.status == 'Chờ duyệt')
                           .length,
                       'Hàng đợi eKYC',
+                      LucideIcons.idCard,
+                      PT.amber,
+                      const Color(0xFFFFF8ED),
                     ),
                   ])
                     SizedBox(
                       width: (c.maxWidth - 10) / 2,
-                      child: flowCard(stat.$1, [
-                        Text(
-                          '${stat.$2}',
-                          style: PT.title(32).copyWith(color: PT.green),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: PT.card(radius: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${stat.$2}',
+                                    style: PT.title(28).copyWith(color: stat.$5),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: stat.$6,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    stat.$4,
+                                    size: 18,
+                                    color: stat.$5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(stat.$1, style: PT.title(15)),
+                            const SizedBox(height: 4),
+                            Text(stat.$3, style: PT.body(11, PT.muted)),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(stat.$3, style: PT.body(11, PT.muted)),
-                      ]),
+                      ),
                     ),
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.all(14),
-              margin: const EdgeInsets.only(bottom: 14),
-              decoration: PT.card(color: PT.mint),
-              child: Wrap(
-                spacing: 16,
-                runSpacing: 8,
-                alignment: WrapAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Doanh thu hệ thống', style: PT.body(12, PT.muted)),
-                      Text(
-                        '${(totalRevenue / 1000000).toStringAsFixed(2)}tr đ',
-                        style: PT.title(22).copyWith(color: PT.green),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Thành viên VIP', style: PT.body(12, PT.muted)),
-                      Text('$vipCount tài khoản', style: PT.title(18)),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Tin đẩy nổi bật', style: PT.body(12, PT.muted)),
-                      Text('$boostedRooms phòng', style: PT.title(18)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 16),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -158,77 +267,128 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
             const SizedBox(height: 12),
             if (analyticsTab == 0) ...[
-              flowCard('Tăng trưởng hệ thống 6 tháng', [
-                Text(
-                  'Số lượng người dùng mới & tin đăng phòng theo tháng',
-                  style: PT.body(12, PT.muted),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 110,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+              RepaintBoundary(
+                child: flowCard('Tăng trưởng hệ thống 6 tháng', [
+                  Text(
+                    'Số lượng người dùng mới & tin đăng phòng theo tháng',
+                    style: PT.body(12, PT.muted),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
                     children: [
-                      for (final m in const [
-                        ('T5', 0.45, 0.35),
-                        ('T6', 0.55, 0.48),
-                        ('T7', 0.64, 0.52),
-                        ('T8', 0.76, 0.68),
-                        ('T9', 0.88, 0.78),
-                        ('T10', 1.0, 0.92),
-                      ])
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 3),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Expanded(
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Flexible(
-                                        child: FractionallySizedBox(
-                                          heightFactor: m.$2,
-                                          child: Container(
-                                            width: 8,
-                                            decoration: BoxDecoration(
-                                              color: PT.green,
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Flexible(
-                                        child: FractionallySizedBox(
-                                          heightFactor: m.$3,
-                                          child: Container(
-                                            width: 8,
-                                            decoration: BoxDecoration(
-                                              color: PT.amber,
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(m.$1, style: PT.body(10, PT.muted)),
-                              ],
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: PT.green,
+                              borderRadius: BorderRadius.circular(3),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 5),
+                          Text('Người dùng mới', style: PT.body(11, PT.muted)),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: PT.amber,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text('Tin đăng mới', style: PT.body(11, PT.muted)),
+                        ],
+                      ),
                     ],
                   ),
-                ),
-              ]),
-              flowCard('Mức độ hài lòng hệ thống ($avgSatisfaction/5 ★)', [
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 116,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: PT.grey.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        for (final m in const [
+                          ('T5', 0.45, 0.35),
+                          ('T6', 0.55, 0.48),
+                          ('T7', 0.64, 0.52),
+                          ('T8', 0.76, 0.68),
+                          ('T9', 0.88, 0.78),
+                          ('T10', 1.0, 0.92),
+                        ])
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 3,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Flexible(
+                                          child: FractionallySizedBox(
+                                            heightFactor: m.$2,
+                                            child: Container(
+                                              width: 8,
+                                              decoration: BoxDecoration(
+                                                color: PT.green,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Flexible(
+                                          child: FractionallySizedBox(
+                                            heightFactor: m.$3,
+                                            child: Container(
+                                              width: 8,
+                                              decoration: BoxDecoration(
+                                                color: PT.amber,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(m.$1, style: PT.body(10, PT.muted)),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ]),
+              ),
+              flowCard('Mức độ hài lòng hệ thống ($avgSatisfaction/5)', [
                 for (final star in [
                   (5, 0.72),
                   (4, 0.18),
@@ -241,8 +401,19 @@ class _AdminScreenState extends State<AdminScreen> {
                     child: Row(
                       children: [
                         SizedBox(
-                          width: 36,
-                          child: Text('${star.$1} ★', style: PT.body(12)),
+                          width: 42,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('${star.$1}', style: PT.body(12)),
+                              const SizedBox(width: 2),
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 14,
+                                color: PT.amber,
+                              ),
+                            ],
+                          ),
                         ),
                         Expanded(
                           child: ClipRRect(
@@ -258,13 +429,19 @@ class _AdminScreenState extends State<AdminScreen> {
                       ],
                     ),
                   ),
-                const Divider(height: 18),
+                const Divider(height: 18, color: PT.line),
                 for (final fb in feedbacks)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: PT.card(color: PT.mint),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: PT.mint.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: PT.green.withValues(alpha: 0.2),
+                        ),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -275,7 +452,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
-                                '${fb.authorName} (${fb.roleLabel}) • ${fb.rating}★',
+                                '${fb.authorName} (${fb.roleLabel}) • ${fb.rating}/5',
                                 style: PT.title(14),
                               ),
                               InkWell(
@@ -283,7 +460,9 @@ class _AdminScreenState extends State<AdminScreen> {
                                     .deleteSystemFeedback(fb.id),
                                 child: Text(
                                   'Xóa phản hồi',
-                                  style: PT.body(11, PT.error),
+                                  style: PT.body(11, PT.error).copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
@@ -318,19 +497,24 @@ class _AdminScreenState extends State<AdminScreen> {
                           ],
                         ),
                         const SizedBox(height: 4),
-                        LinearProgressIndicator(
-                          value: tier.$2,
-                          minHeight: 7,
-                          color: PT.green,
-                          backgroundColor: PT.mint,
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: tier.$2,
+                            minHeight: 7,
+                            color: PT.green,
+                            backgroundColor: PT.mint,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                const Divider(height: 16),
+                const Divider(height: 16, color: PT.line),
                 Text(
                   'Hiệu suất ghép đôi ở ghép: 87% tương thích • Tỷ lệ xác minh eKYC: 92%',
-                  style: PT.body(13, PT.green),
+                  style: PT.body(13, PT.green).copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ]),
             ],
@@ -341,11 +525,14 @@ class _AdminScreenState extends State<AdminScreen> {
                   style: PT.title(17).copyWith(color: PT.green),
                 ),
                 const SizedBox(height: 8),
-                const LinearProgressIndicator(
-                  value: 0.84,
-                  minHeight: 8,
-                  color: PT.green,
-                  backgroundColor: PT.mint,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: const LinearProgressIndicator(
+                    value: 0.84,
+                    minHeight: 8,
+                    color: PT.green,
+                    backgroundColor: PT.mint,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -359,13 +546,18 @@ class _AdminScreenState extends State<AdminScreen> {
                 ),
               ]),
             ],
+            const SizedBox(height: 6),
+            Text('Kiểm duyệt & An toàn hệ thống', style: PT.title(19)),
+            const SizedBox(height: 10),
             MenuRow(
+              spacious: true,
               icon: LucideIcons.fileCheck,
               title: 'Duyệt CCCD',
               subtitle: 'Hồ sơ và kết quả theo submission ID',
               onTap: () => openPage(context, AdminQueueScreen(state: state)),
             ),
             MenuRow(
+              spacious: true,
               icon: LucideIcons.house,
               title: 'Duyệt tin phòng',
               subtitle:
@@ -373,24 +565,31 @@ class _AdminScreenState extends State<AdminScreen> {
               onTap: () => openPage(context, AdminRoomsScreen(state: state)),
             ),
             MenuRow(
+              spacious: true,
               icon: LucideIcons.flag,
               title: 'Báo cáo vi phạm',
               subtitle: 'Nội dung, xử lý và lịch sử',
               onTap: () => openPage(context, AdminReportsScreen(state: state)),
             ),
+            const SizedBox(height: 8),
+            Text('Người dùng & Thương mại', style: PT.title(19)),
+            const SizedBox(height: 10),
             MenuRow(
+              spacious: true,
               icon: LucideIcons.users,
               title: 'Quản lý người dùng',
               subtitle: 'Tra cứu, khóa / mở khóa',
               onTap: () => openPage(context, AdminUsersScreen(state: state)),
             ),
             MenuRow(
+              spacious: true,
               icon: LucideIcons.package,
               title: 'Quản lý gói dịch vụ',
               subtitle: '${state.store.plans.length} gói cước & bảng giá VIP',
               onTap: () => openPage(context, AdminPackagesScreen(state: state)),
             ),
             MenuRow(
+              spacious: true,
               icon: LucideIcons.scale,
               title: 'Khiếu nại & Nhật ký hệ thống',
               subtitle: 'Giải quyết tranh chấp đánh giá & giao dịch',
@@ -1104,25 +1303,60 @@ class _AdminRoomsScreenState extends State<AdminRoomsScreen> {
             ),
           for (final r in items)
             flowCard(r.title, [
-              Text(r.address),
-              Text('${r.price}đ/tháng • ${r.area}m² • Tầng ${r.floor}'),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  Pill(
+                    r.status.label,
+                    dense: true,
+                    color: r.status == RoomStatus.pending
+                        ? PT.amber
+                        : r.status == RoomStatus.hidden
+                        ? PT.muted
+                        : PT.green,
+                  ),
+                  Pill(
+                    '${r.price}đ/tháng',
+                    dense: true,
+                    color: PT.green,
+                  ),
+                  Pill(
+                    '${r.area}m² • Tầng ${r.floor}',
+                    dense: true,
+                    color: PT.green,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(r.address, style: PT.body(14, PT.deep)),
+              const SizedBox(height: 4),
               Text(
                 'Cọc: ${r.depositLabel} • Điện: ${r.electricity} • Nước: ${r.water}',
                 style: PT.body(12, PT.muted),
               ),
-              Text(r.landlordName),
-              Text(r.description),
+              const SizedBox(height: 4),
+              Text(
+                'Chủ trọ: ${r.landlordName}',
+                style: PT.body(13, PT.green).copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(r.description, style: PT.body(13, PT.muted)),
               const SizedBox(height: 12),
               PrimaryButton(
                 'Xem chi tiết tin',
                 outline: true,
+                icon: LucideIcons.externalLink,
                 onTap: () =>
                     openPage(ctx, RoomDetailScreen(state: state, room: r)),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               if (r.status != RoomStatus.available)
                 PrimaryButton(
                   'Duyệt tin phòng',
+                  icon: LucideIcons.check,
                   busy: f.busy,
                   onTap: f.busy
                       ? null
@@ -1330,20 +1564,53 @@ class _AdminPackagesScreenState extends State<AdminPackagesScreen> {
             flowCard('${plan.name} (${plan.id})', [
               Pill(
                 plan.landlord ? 'Dành cho Chủ trọ' : 'Dành cho Người thuê',
+                dense: true,
                 color: PT.green,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Giá tháng: ${plan.monthly}đ${plan.yearly > 0 ? ' • Giá năm: ${plan.yearly}đ' : ''}',
-                style: PT.title(17),
-              ),
-              Text(plan.description),
-              if (plan.features.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                for (final ft in plan.features)
-                  Text('• $ft', style: PT.body(13, PT.muted)),
-              ],
               const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: PT.mint.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Giá tháng: ${plan.monthly}đ${plan.yearly > 0 ? ' • Giá năm: ${plan.yearly}đ' : ''}',
+                      style: PT.title(17).copyWith(color: PT.green),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(plan.description, style: PT.body(13, PT.deep)),
+                  ],
+                ),
+              ),
+              if (plan.features.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                for (final ft in plan.features)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(
+                            LucideIcons.circleCheck,
+                            size: 14,
+                            color: PT.green,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(ft, style: PT.body(13, PT.muted)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              const Divider(height: 20, color: PT.line),
               Wrap(
                 spacing: 8,
                 runSpacing: 6,
@@ -1423,25 +1690,48 @@ class _AdminDisputesScreenState extends State<AdminDisputesScreen> {
                 'Khi chủ trọ khiếu nại đánh giá không đúng sự thật, yêu cầu sẽ hiển thị tại đây.',
               ),
             for (final r in disputedReviews)
-              flowCard('Đánh giá ${r.id} • ${r.rating}/5 ★', [
+              flowCard('Đánh giá ${r.id} • ${r.rating}/5 sao', [
                 Pill('Trạng thái: ${r.disputeStatus}', color: PT.amber),
-                const SizedBox(height: 6),
-                Text('Người viết: ${r.authorName} • Phòng: ${r.targetId}'),
-                Text('Nội dung đánh giá: ${r.comment}'),
-                if (r.disputeReason != null)
-                  Text(
-                    'Lý do chủ trọ khiếu nại: ${r.disputeReason}',
-                    style: PT.body(13, PT.error),
+                const SizedBox(height: 8),
+                Text(
+                  'Người viết: ${r.authorName} • Phòng: ${r.targetId}',
+                  style: PT.body(13, PT.muted),
+                ),
+                const SizedBox(height: 4),
+                Text('Nội dung đánh giá: ${r.comment}', style: PT.body(14)),
+                if (r.disputeReason != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: PT.error.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Lý do chủ trọ khiếu nại: ${r.disputeReason}',
+                      style: PT.body(13, PT.error),
+                    ),
                   ),
-                if (r.disputeResolutionNote != null)
-                  Text(
-                    'Kết luận Admin: ${r.disputeResolutionNote}',
-                    style: PT.body(13, PT.green),
+                ],
+                if (r.disputeResolutionNote != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: PT.mint,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Kết luận Admin: ${r.disputeResolutionNote}',
+                      style: PT.body(13, PT.green),
+                    ),
                   ),
+                ],
                 if (r.disputeStatus == 'Chờ xử lý') ...[
                   const SizedBox(height: 12),
                   PrimaryButton(
                     'Gỡ đánh giá vi phạm',
+                    icon: LucideIcons.trash2,
                     busy: f.busy,
                     onTap: f.busy
                         ? null
@@ -1457,6 +1747,7 @@ class _AdminDisputesScreenState extends State<AdminDisputesScreen> {
                   PrimaryButton(
                     'Giữ nguyên đánh giá (Bác bỏ khiếu nại)',
                     outline: true,
+                    icon: LucideIcons.shieldCheck,
                     busy: f.busy,
                     onTap: f.busy
                         ? null
@@ -1480,11 +1771,15 @@ class _AdminDisputesScreenState extends State<AdminDisputesScreen> {
             for (final o in s.store.orders.reversed)
               flowCard('${o.plan.name} • ${o.amount}đ', [
                 Text('Mã đơn: ${o.id} • Khách hàng: ${o.userId}'),
+                const SizedBox(height: 4),
                 Text(
                   'Phương thức: ${o.method} • Chu kỳ: ${o.yearly ? 'Năm' : 'Tháng'}',
+                  style: PT.body(13, PT.muted),
                 ),
+                const SizedBox(height: 8),
                 Pill(
                   o.status,
+                  dense: true,
                   color: o.status == 'Thành công' ? PT.green : PT.amber,
                 ),
               ]),
@@ -1492,7 +1787,25 @@ class _AdminDisputesScreenState extends State<AdminDisputesScreen> {
           if (tab == 2) ...[
             for (final log in s.store.auditLogs)
               flowCard('${log.action} • ${log.target}', [
-                Text('IP: ${log.ipAddress}'),
+                Row(
+                  children: [
+                    const Icon(
+                      LucideIcons.shield,
+                      size: 15,
+                      color: PT.green,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'IP: ${log.ipAddress}',
+                        style: PT.body(13, PT.deep).copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 Text(
                   'Quản trị viên: ${log.actorName} • Thời gian: ${log.timestamp.toIso8601String().substring(0, 16)}',
                   style: PT.body(12, PT.muted),

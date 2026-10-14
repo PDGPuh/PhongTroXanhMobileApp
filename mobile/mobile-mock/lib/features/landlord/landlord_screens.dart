@@ -58,9 +58,12 @@ class LandlordScreen extends StatelessWidget {
     final totalContacts =
         myRooms.fold<int>(0, (sum, r) => sum + r.contactCount);
     final profile = state.store.profiles[state.userId];
+    final monthlyEst = myRooms
+        .where((r) => r.status == RoomStatus.available || r.status == RoomStatus.rented)
+        .fold<int>(0, (sum, r) => sum + r.price);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
         Header(
           unreadNotifications: state.unreadNotifications,
@@ -77,9 +80,111 @@ class LandlordScreen extends StatelessWidget {
               openPage(context, NotificationsScreen(state: state)),
         ),
         const PageHeading(
-          'Chủ trọ 👋',
-          'Quản lý phòng trọ hiệu quả, dễ dàng hơn mỗi ngày',
+          'Bảng điều khiển Chủ trọ',
+          'Quản lý tài sản, hợp đồng và tối ưu hiệu suất cho thuê',
         ),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [PT.deep, Color(0xFF006B54)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x18073B3C),
+                blurRadius: 20,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Pill(
+                    'Hội viên: ${profile?.package ?? 'Miễn phí'}',
+                    dense: true,
+                    color: Colors.white,
+                    bg: Colors.white.withValues(alpha: 0.16),
+                  ),
+                  Pill(
+                    '${profile?.boosts ?? 0} lượt Đẩy tin',
+                    dense: true,
+                    color: PT.deep,
+                    bg: const Color(0xFFFDE68A),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Doanh thu dự kiến danh mục',
+                style: PT.body(12, Colors.white.withValues(alpha: 0.78)),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${(monthlyEst / 1000000).toStringAsFixed(1)} triệu đ / tháng',
+                style: PT.title(24).copyWith(color: Colors.white),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Nâng cấp Chủ trọ Pro / Premium để nhận lượt đẩy tin VIP và báo cáo chuyên sâu.',
+                style: PT.body(12, Colors.white.withValues(alpha: 0.82)),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: PT.deep,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () =>
+                        openPage(context, PostRoomScreen(state: state)),
+                    icon: const Icon(LucideIcons.plus, size: 16),
+                    label: const Text('Đăng phòng mới'),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.35),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () =>
+                        openPage(context, PackagesScreen(state: state)),
+                    icon: const Icon(LucideIcons.zap, size: 16),
+                    label: const Text('Nâng cấp hội viên / Mua lượt Đẩy tin'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
             final columns = constraints.maxWidth >= 680 ? 4 : 2;
@@ -128,122 +233,102 @@ class LandlordScreen extends StatelessWidget {
           },
         ),
         const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: PT.card(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(LucideIcons.trendingUp, size: 20, color: PT.green),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Thống kê lượt xem 7 ngày qua',
-                      style: PT.title(18),
+        RepaintBoundary(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: PT.card(radius: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: PT.mint,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        LucideIcons.trendingUp,
+                        size: 18,
+                        color: PT.green,
+                      ),
                     ),
-                  ),
-                  const Pill('+18%', dense: true, color: PT.green),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '$totalViews lượt xem • $totalSaves lượt lưu • $totalContacts liên hệ',
-                style: PT.body(13, PT.muted),
-              ),
-              const SizedBox(height: 14),
-              _Views7DaysChart(baseViews: totalViews),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Tỉ lệ lấp đầy phòng ($rentedCount/${myRooms.length})',
-                      style: PT.body(13, PT.muted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Thống kê lượt xem 7 ngày qua',
+                            style: PT.title(17),
+                          ),
+                          Text(
+                            '$totalViews lượt xem • $totalSaves lượt lưu • $totalContacts liên hệ',
+                            style: PT.body(12, PT.muted),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    '$occupancyRate%',
-                    style: PT.body(14, PT.green).copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: (occupancyRate / 100).clamp(0.0, 1.0),
-                  minHeight: 8,
-                  color: PT.green,
-                  backgroundColor: PT.mint,
+                    const Pill('+18%', dense: true, color: PT.green),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: PT.card(color: PT.mint),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(LucideIcons.gem, size: 22, color: PT.green),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Hội viên: ${profile?.package ?? 'Miễn phí'}',
-                      style: PT.title(18),
+                const SizedBox(height: 16),
+                _Views7DaysChart(baseViews: totalViews),
+                const Divider(height: 24, color: PT.line),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Tỉ lệ lấp đầy phòng ($rentedCount/${myRooms.length})',
+                        style: PT.body(13, PT.muted),
+                      ),
                     ),
-                  ),
-                  Pill(
-                    '${profile?.boosts ?? 0} lượt Đẩy tin',
-                    dense: true,
+                    Text(
+                      '$occupancyRate%',
+                      style: PT.body(14, PT.green).copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: (occupancyRate / 100).clamp(0.0, 1.0),
+                    minHeight: 8,
                     color: PT.green,
-                    bg: Colors.white,
+                    backgroundColor: PT.mint,
                   ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Nâng cấp Chủ trọ Pro / Premium để nhận lượt đẩy tin VIP và báo cáo chuyên sâu.',
-                style: PT.body(13, PT.muted),
-              ),
-              const SizedBox(height: 12),
-              PrimaryButton(
-                'Nâng cấp hội viên / Mua lượt Đẩy tin',
-                outline: true,
-                icon: LucideIcons.zap,
-                onTap: () => openPage(context, PackagesScreen(state: state)),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 8),
         Text('Số liệu minh họa trong bản demo', style: PT.caption()),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
         Row(
           children: [
-            Expanded(child: Text('Hoạt động gần đây', style: PT.title(23))),
-            TextButton(
+            Expanded(child: Text('Hoạt động gần đây', style: PT.title(21))),
+            TextButton.icon(
               onPressed: () =>
                   openPage(context, LandlordRoomsScreen(state: state)),
-              child: const Text('Xem tất cả'),
+              icon: const Icon(LucideIcons.arrowRight, size: 15),
+              label: const Text('Xem tất cả'),
             ),
           ],
         ),
+        const SizedBox(height: 4),
         ...myRooms
             .take(3)
             .map((r) => _ManageRoomTile(state: state, room: r)),
         const SizedBox(height: 16),
+        Text('Quản lý vận hành & Hợp đồng', style: PT.title(19)),
+        const SizedBox(height: 10),
         MenuRow(
           spacious: true,
-          framed: false,
           icon: LucideIcons.users,
           title: 'Người thuê',
           subtitle: 'Hợp đồng, bàn giao phòng và đánh giá',
@@ -251,46 +336,13 @@ class LandlordScreen extends StatelessWidget {
         ),
         MenuRow(
           spacious: true,
-          framed: false,
           icon: LucideIcons.arrowLeftRight,
           title: 'Yêu cầu đổi phòng',
           subtitle: 'Đối chiếu hồ sơ và duyệt chuyển nhượng',
           onTap: () => openPage(context, LandlordSwapsScreen(state: state)),
         ),
-        PrimaryButton(
-          'Đăng phòng mới',
-          icon: LucideIcons.plus,
-          onTap: () => openPage(context, PostRoomScreen(state: state)),
-        ),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: PT.card(color: PT.mint),
-          child: Row(
-            children: [
-              const Icon(LucideIcons.lightbulb, size: 32, color: PT.green),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Mẹo cho chủ trọ', style: PT.title(17)),
-                    const SizedBox(height: 5),
-                    Text(
-                      'Thêm hình ảnh đẹp và mô tả chi tiết sẽ giúp thu hút nhiều người quan tâm hơn!',
-                      style: PT.body(14, PT.muted),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(LucideIcons.chevronRight, size: 18),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
         MenuRow(
           spacious: true,
-          framed: false,
           icon: LucideIcons.qrCode,
           title: 'Mã QR nhận phòng',
           subtitle: 'Tạo mã và chia sẻ cho người thuê',
@@ -298,11 +350,49 @@ class LandlordScreen extends StatelessWidget {
         ),
         MenuRow(
           spacious: true,
-          framed: false,
           icon: LucideIcons.star,
           title: 'Đánh giá & Phản hồi',
           subtitle: 'Phản hồi công khai và khiếu nại đánh giá',
           onTap: () => openPage(context, LandlordReviewsScreen(state: state)),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: PT.mint,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: PT.green.withValues(alpha: 0.22)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  LucideIcons.lightbulb,
+                  size: 22,
+                  color: PT.green,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Mẹo tối ưu tỷ lệ lấp đầy', style: PT.title(16)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Cập nhật biểu phí điện nước minh bạch và bật Đẩy tin VIP vào cuối tuần giúp tăng 2.4x lượt liên hệ.',
+                      style: PT.body(13, PT.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -317,8 +407,13 @@ class _Views7DaysChart extends StatelessWidget {
     const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
     const weights = [0.45, 0.62, 0.54, 0.78, 0.70, 0.92, 1.0];
     final peak = (baseViews / 4).clamp(8, 120).round();
-    return SizedBox(
-      height: 112,
+    return Container(
+      height: 118,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      decoration: BoxDecoration(
+        color: PT.grey.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -331,17 +426,26 @@ class _Views7DaysChart extends StatelessWidget {
                   children: [
                     Text(
                       '${(peak * weights[i]).round()}',
-                      style: PT.caption(),
+                      style: PT.caption(
+                        i == days.length - 1 ? PT.green : PT.muted,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.clip,
                     ),
                     const SizedBox(height: 4),
                     Container(
-                      height: 52 * weights[i],
+                      height: 50 * weights[i],
                       decoration: BoxDecoration(
-                        color: i == days.length - 1
-                            ? PT.green
-                            : PT.green.withValues(alpha: 0.35),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: i == days.length - 1
+                              ? const [PT.green, PT.deep]
+                              : [
+                                  PT.green.withValues(alpha: 0.55),
+                                  PT.green.withValues(alpha: 0.25),
+                                ],
+                        ),
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
@@ -378,40 +482,57 @@ class _SmallStat extends StatelessWidget {
   );
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: bg,
+      color: Colors.white,
       borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: PT.line),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0A073B3C),
+          blurRadius: 12,
+          offset: Offset(0, 4),
+        ),
+      ],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Expanded(child: Text(value, style: PT.title(28))),
+            Expanded(child: Text(value, style: PT.title(26))),
             ExcludeSemantics(
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(10),
+                  color: bg,
                 ),
-                child: Icon(icon, size: 20, color: color),
+                child: Icon(icon, size: 18, color: color),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         ConstrainedBox(
           constraints: BoxConstraints(
-            minHeight: MediaQuery.textScalerOf(context).scale(14) * 1.5 * 2,
+            minHeight: MediaQuery.textScalerOf(context).scale(13) * 1.45 * 2,
           ),
           child: Text(label, style: PT.body(13, PT.muted)),
         ),
-        const SizedBox(height: 12),
-        Text(
-          badge,
-          style: PT.body(12, PT.deep).copyWith(fontWeight: FontWeight.w500),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            badge,
+            style: PT.body(11, color).copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     ),
@@ -423,137 +544,155 @@ class _ManageRoomTile extends StatelessWidget {
   final Room room;
   const _ManageRoomTile({required this.state, required this.room});
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    decoration: PT.card(radius: 16),
-    child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () =>
-            openPage(context, ManageRoomScreen(state: state, room: room)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 104,
-                height: 96,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Stack(
-                    children: [
-                      Positioned.fill(child: RoomPhoto(room: room)),
-                      Positioned(
-                        left: 4,
-                        top: 4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: PT.mint,
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Text(
-                            state.roomStatus[room.id] ?? 'Chờ duyệt',
-                            style: PT.body(8, PT.green),
-                          ),
-                        ),
-                      ),
-                      if (room.isBoosted)
+  Widget build(BuildContext context) {
+    final statusLabel = state.roomStatus[room.id] ?? 'Chờ duyệt';
+    final isPending = statusLabel == 'Chờ duyệt';
+    final isHidden = statusLabel == 'Đã ẩn';
+    final badgeColor = isPending
+        ? PT.amber
+        : isHidden
+        ? PT.muted
+        : PT.green;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: PT.card(radius: 16),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () =>
+              openPage(context, ManageRoomScreen(state: state, room: room)),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 102,
+                  height: 98,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(child: RoomPhoto(room: room)),
                         Positioned(
-                          right: 4,
-                          bottom: 4,
+                          left: 6,
+                          top: 6,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
+                              horizontal: 7,
+                              vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: PT.amber,
-                              borderRadius: BorderRadius.circular(10),
+                              color: Colors.white.withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
-                              'VIP',
-                              style: PT.body(9, Colors.white).copyWith(
+                              statusLabel,
+                              style: PT.body(9, badgeColor).copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
                         ),
+                        if (room.isBoosted)
+                          Positioned(
+                            right: 6,
+                            bottom: 6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: PT.amber,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'VIP',
+                                style: PT.body(9, Colors.white).copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        room.title,
+                        style: PT.title(16),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${room.district}, TP.HCM • ${room.area}m²',
+                        style: PT.body(12, PT.muted),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(room.priceLabel, style: PT.price(16)),
+                      if (room.expiresAt != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Hết hạn: ${room.expiresAt!.toString().substring(0, 10)}',
+                          style: PT.body(11, PT.green),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 4,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                LucideIcons.eye,
+                                size: 12,
+                                color: PT.muted,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${state.roomViews(room.id)} lượt xem',
+                                style: PT.body(11, PT.muted),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                LucideIcons.heart,
+                                size: 12,
+                                color: PT.muted,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${state.roomSaves(room.id)} lượt lưu',
+                                style: PT.body(11, PT.muted),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(room.title, style: PT.title(16)),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${room.district}, TP.HCM',
-                      style: PT.body(12, PT.muted),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(room.priceLabel, style: PT.price(17)),
-                    if (room.expiresAt != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Hết hạn: ${room.expiresAt!.toString().substring(0, 10)}',
-                        style: PT.body(11, PT.green),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              LucideIcons.eye,
-                              size: 12,
-                              color: PT.muted,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${state.roomViews(room.id)} lượt xem',
-                              style: PT.body(11, PT.muted),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              LucideIcons.heart,
-                              size: 12,
-                              color: PT.muted,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${state.roomSaves(room.id)} lượt lưu',
-                              style: PT.body(11, PT.muted),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(LucideIcons.chevronRight, size: 17),
-            ],
+                const Icon(LucideIcons.chevronRight, size: 18, color: PT.muted),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class LandlordRoomsScreen extends StatefulWidget {
@@ -618,18 +757,31 @@ class _LandlordRoomsScreenState extends State<LandlordRoomsScreen> {
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: PT.card(color: PT.mint),
+              decoration: BoxDecoration(
+                color: PT.mint,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: PT.green.withValues(alpha: 0.22)),
+              ),
               child: Wrap(
                 spacing: 8,
                 runSpacing: 6,
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text(
-                    'Lượt đẩy tin còn lại: $boostsLeft lượt',
-                    style: PT.body(13, PT.deep).copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(LucideIcons.zap, size: 16, color: PT.green),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Lượt đẩy tin còn lại: $boostsLeft lượt',
+                          style: PT.body(13, PT.deep).copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   TextButton(
                     onPressed: () =>
@@ -686,29 +838,71 @@ class ManageRoomScreen extends StatelessWidget implements ResourceScreen {
             ),
             const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.all(14),
-              decoration: PT.card(color: PT.mint),
+              padding: const EdgeInsets.all(16),
+              decoration: PT.card(radius: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Chi tiết vận hành & Chi phí', style: PT.title(17)),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('Chi tiết vận hành & Chi phí', style: PT.title(18)),
+                      Pill(
+                        room.isBoosted ? 'Đang nổi bật VIP' : 'Tin thường',
+                        dense: true,
+                        color: room.isBoosted ? PT.amber : PT.green,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   Text(
-                    'Trạng thái: ${state.roomStatus[room.id]} • Hạn tin: $expiryText',
-                    style: PT.body(13),
+                    'Trạng thái: ${state.roomStatus[room.id]} • Hạn tin: $expiryText • Còn $boostsLeft lượt Đẩy tin',
+                    style: PT.body(13, PT.muted),
                   ),
-                  Text(
-                    'Đẩy tin: ${room.isBoosted ? 'Đang nổi bật VIP' : 'Tin thường'} (Còn $boostsLeft lượt)',
-                    style: PT.body(13, PT.green),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Đặt cọc: ${room.depositLabel} • Điện: ${room.electricity} • Nước: ${room.water}',
-                    style: PT.body(12, PT.muted),
-                  ),
-                  Text(
-                    'Internet: ${room.internetFee} • Gửi xe: ${room.parkingFee} • Dịch vụ: ${room.serviceFee}',
-                    style: PT.body(12, PT.muted),
+                  const Divider(height: 20, color: PT.line),
+                  LayoutBuilder(
+                    builder: (context, c) {
+                      final colWidth = (c.maxWidth - 10) / 2;
+                      final fees = [
+                        ('Đặt cọc', room.depositLabel),
+                        ('Điện', room.electricity),
+                        ('Nước', room.water),
+                        ('Internet', room.internetFee),
+                        ('Gửi xe', room.parkingFee),
+                        ('Dịch vụ', room.serviceFee),
+                      ];
+                      return Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          for (final item in fees)
+                            Container(
+                              width: colWidth,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: PT.mint.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.$1, style: PT.body(11, PT.muted)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    item.$2,
+                                    style: PT.body(13, PT.deep).copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -1143,17 +1337,65 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
           children: [
             if (submitError != null)
               Text(submitError!, style: PT.body(14, PT.error)),
-            Text(
-              'Bước ${step + 1}/5 • ${['Thông tin', 'Giá & phí', 'Hình ảnh', 'Vị trí', 'Xem trước'][step]}',
-              style: PT.body(13, PT.green),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: PT.card(color: PT.mint, radius: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bước ${step + 1}/5 • ${['Thông tin', 'Giá & phí', 'Hình ảnh', 'Vị trí', 'Xem trước'][step]}',
+                    style: PT.body(13, PT.green).copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: (step + 1) / 5,
+                      minHeight: 7,
+                      color: PT.green,
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (var i = 0; i < 5; i++)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: i == step
+                                ? PT.green
+                                : i < step
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '${i + 1}. ${['Thông tin', 'Giá & phí', 'Hình ảnh', 'Vị trí', 'Xem trước'][i]}',
+                            style: PT.body(
+                              11,
+                              i == step
+                                  ? Colors.white
+                                  : i < step
+                                  ? PT.green
+                                  : PT.muted,
+                            ).copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: (step + 1) / 5,
-              color: PT.green,
-              backgroundColor: PT.mint,
-            ),
-            const SizedBox(height: 25),
+            const SizedBox(height: 20),
             if (step == 0) ...[
               TextFormField(
                 controller: title,
@@ -1619,103 +1861,157 @@ class _LandlordQRScreenState extends State<LandlordQRScreen> {
                   .toList(),
               onChanged: (id) => setState(() => selectedId = id),
             ),
-            const SizedBox(height: 20),
-            Text(selected.room.title, style: PT.title(25)),
-            const SizedBox(height: 18),
-            Pill(
-              selected.checkedIn ? 'Đã nhận phòng' : 'Chờ nhận phòng',
-              color: PT.green,
-            ),
-            const SizedBox(height: 20),
-            if (!selected.checkedIn) ...[
-              Container(
-                height: 230,
-                decoration: PT.card(color: PT.mint),
-                alignment: Alignment.center,
-                child: selected.codeExpiresAt?.isBefore(DateTime.now()) ?? false
-                    ? const Text('Mã đã hết hạn. Hãy tạo mã mới.')
-                    : QrImageView(
-                        data: selected.code,
-                        size: 210,
-                        backgroundColor: Colors.white,
-                        semanticsLabel: 'QR nhận phòng hợp đồng ${selected.id}',
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: PT.card(radius: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Pill(
+                        selected.checkedIn
+                            ? 'Đã nhận phòng'
+                            : 'Chờ nhận phòng',
+                        color: PT.green,
                       ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                selected.code,
-                style: PT.title(22),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              if (selected.codeExpiresAt != null)
-                Text(
-                  '${selected.codeExpiresAt!.isBefore(DateTime.now()) ? 'Mã đã hết hạn' : 'Hạn sử dụng'}: ${selected.codeExpiresAt!.toString().substring(0, 16)}',
-                  style: PT.body(
-                    14,
-                    selected.codeExpiresAt!.isBefore(DateTime.now())
-                        ? PT.error
-                        : PT.muted,
+                      Text(
+                        'HĐ: ${selected.id}',
+                        style: PT.body(12, PT.muted),
+                      ),
+                    ],
                   ),
-                ),
-              if (error != null) Text(error!, style: PT.body(14, PT.error)),
-              PrimaryButton(
-                'Sao chép mã',
-                outline: true,
-                onTap: busy
-                    ? null
-                    : () async {
-                        try {
-                          await Clipboard.setData(
-                            ClipboardData(text: selected.code),
-                          );
-                          if (context.mounted) {
-                            message(context, 'Đã sao chép mã nhận phòng.');
-                          }
-                        } catch (_) {
-                          if (mounted) {
-                            setState(
-                              () => error =
-                                  'Chưa sao chép được. Hãy chọn và sao chép mã thủ công.',
-                            );
-                          }
-                        }
-                      },
+                  const SizedBox(height: 10),
+                  Text(selected.room.title, style: PT.title(23)),
+                  const SizedBox(height: 16),
+                  if (!selected.checkedIn) ...[
+                    RepaintBoundary(
+                      child: Container(
+                        height: 230,
+                        decoration: BoxDecoration(
+                          color: PT.mint,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: PT.green.withValues(alpha: 0.22),
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child:
+                            selected.codeExpiresAt?.isBefore(DateTime.now()) ??
+                                false
+                            ? const Text('Mã đã hết hạn. Hãy tạo mã mới.')
+                            : QrImageView(
+                                data: selected.code,
+                                size: 204,
+                                backgroundColor: Colors.white,
+                                semanticsLabel:
+                                    'QR nhận phòng hợp đồng ${selected.id}',
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: PT.grey,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        selected.code,
+                        style: PT.title(22).copyWith(letterSpacing: 1.5),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (selected.codeExpiresAt != null)
+                      Text(
+                        '${selected.codeExpiresAt!.isBefore(DateTime.now()) ? 'Mã đã hết hạn' : 'Hạn sử dụng'}: ${selected.codeExpiresAt!.toString().substring(0, 16)}',
+                        style: PT.body(
+                          13,
+                          selected.codeExpiresAt!.isBefore(DateTime.now())
+                              ? PT.error
+                              : PT.muted,
+                        ),
+                      ),
+                    if (error != null)
+                      Text(error!, style: PT.body(14, PT.error)),
+                    const SizedBox(height: 14),
+                    PrimaryButton(
+                      'Sao chép mã',
+                      outline: true,
+                      icon: LucideIcons.copy,
+                      onTap: busy
+                          ? null
+                          : () async {
+                              try {
+                                await Clipboard.setData(
+                                  ClipboardData(text: selected.code),
+                                );
+                                if (context.mounted) {
+                                  message(
+                                    context,
+                                    'Đã sao chép mã nhận phòng.',
+                                  );
+                                }
+                              } catch (_) {
+                                if (mounted) {
+                                  setState(
+                                    () => error =
+                                        'Chưa sao chép được. Hãy chọn và sao chép mã thủ công.',
+                                  );
+                                }
+                              }
+                            },
+                    ),
+                    const SizedBox(height: 10),
+                    PrimaryButton(
+                      'Tạo mã mới (24 giờ)',
+                      icon: LucideIcons.refreshCw,
+                      busy: busy,
+                      onTap: busy
+                          ? null
+                          : () async {
+                              setState(() {
+                                busy = true;
+                                error = null;
+                              });
+                              try {
+                                await widget.state.workflows.refreshCode(
+                                  selected.id,
+                                );
+                              } catch (e) {
+                                if (mounted) {
+                                  setState(() => error = e.toString());
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => busy = false);
+                                }
+                              }
+                            },
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'QR chứa mã của hợp đồng ${selected.id}; có thể quét bằng camera. Xác nhận nhận phòng vẫn được kiểm tra trong kho demo.',
+                      style: PT.body(13, PT.muted),
+                    ),
+                  ] else
+                    Text(
+                      'Mã đã sử dụng và không thể nhận phòng lần nữa.',
+                      style: PT.body(14, PT.muted),
+                    ),
+                ],
               ),
-              const SizedBox(height: 12),
-              PrimaryButton(
-                'Tạo mã mới (24 giờ)',
-                busy: busy,
-                onTap: busy
-                    ? null
-                    : () async {
-                        setState(() {
-                          busy = true;
-                          error = null;
-                        });
-                        try {
-                          await widget.state.workflows.refreshCode(selected.id);
-                        } catch (e) {
-                          if (mounted) {
-                            setState(() => error = e.toString());
-                          }
-                        } finally {
-                          if (mounted) {
-                            setState(() => busy = false);
-                          }
-                        }
-                      },
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'QR chứa mã của hợp đồng ${selected.id}; có thể quét bằng camera. Xác nhận nhận phòng vẫn được kiểm tra trong kho demo.',
-                style: PT.body(14, PT.muted),
-              ),
-            ] else
-              Text(
-                'Mã đã sử dụng và không thể nhận phòng lần nữa.',
-                style: PT.body(14, PT.muted),
-              ),
+            ),
           ],
         ),
       );

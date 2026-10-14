@@ -358,22 +358,47 @@ class _LandlordTenantsScreenState extends State<LandlordTenantsScreen> {
               runSpacing: 8,
               children: [
                 for (final stat in [
-                  ('Đang thuê', '$activeCount hợp đồng'),
-                  ('TrustScore TB', '$avgTrust/100 điểm'),
-                  ('CCCD xác minh', '$verifiedCount/${allRentals.length} khách'),
+                  (
+                    'Đang thuê',
+                    '$activeCount hợp đồng',
+                    LucideIcons.fileCheck2,
+                  ),
+                  (
+                    'TrustScore TB',
+                    '$avgTrust/100 điểm',
+                    LucideIcons.shieldCheck,
+                  ),
+                  (
+                    'CCCD xác minh',
+                    '$verifiedCount/${allRentals.length} khách',
+                    LucideIcons.idCard,
+                  ),
                 ])
                   SizedBox(
                     width: c.maxWidth < 340
                         ? (c.maxWidth - 8) / 2
                         : (c.maxWidth - 16) / 3,
                     child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: PT.card(color: PT.mint),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: PT.line),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: PT.mint,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(stat.$3, size: 15, color: PT.green),
+                          ),
+                          const SizedBox(height: 8),
                           Text(stat.$1, style: PT.body(11, PT.muted)),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           Text(stat.$2, style: PT.title(15)),
                         ],
                       ),
@@ -382,7 +407,7 @@ class _LandlordTenantsScreenState extends State<LandlordTenantsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -409,23 +434,49 @@ class _LandlordTenantsScreenState extends State<LandlordTenantsScreen> {
             ),
           for (final r in rentals)
             flowCard(state.store.workspaceById(r.tenantId).fullName, [
-              Text(r.room.title, style: PT.body(16)),
-              Text('${r.id} • ${r.status.label}'),
-              Text(
-                r.checkedIn ? 'Đã nhận phòng' : 'Chờ nhận phòng',
-                style: PT.body(14, PT.green),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: PT.grey.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      r.room.title,
+                      style: PT.body(15, PT.deep).copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${r.id} • ${r.status.label}',
+                      style: PT.body(12, PT.muted),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      r.checkedIn ? 'Đã nhận phòng' : 'Chờ nhận phòng',
+                      style: PT.body(13, PT.green).copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
                 children: [
                   Pill(
                     'TrustScore: ${state.store.profiles[r.tenantId]?.trustScore ?? 88}/100',
+                    dense: true,
                     color: PT.green,
                   ),
                   Pill(
                     state.store.workspaceById(r.tenantId).verification,
+                    dense: true,
                     color:
                         state.store.workspaceById(r.tenantId).verification ==
                             'Đã xác minh'
@@ -433,14 +484,25 @@ class _LandlordTenantsScreenState extends State<LandlordTenantsScreen> {
                         : PT.amber,
                   ),
                   if (r.handoverConfirmed)
-                    const Pill('Đã bàn giao phòng', color: PT.green),
+                    const Pill(
+                      'Đã bàn giao phòng',
+                      dense: true,
+                      color: PT.green,
+                    ),
                 ],
               ),
               if (r.terminationReason != null) ...[
                 const SizedBox(height: 8),
-                Text(
-                  'Lý do thanh lý: ${r.terminationReason}',
-                  style: PT.body(13, PT.error),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: PT.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Lý do thanh lý: ${r.terminationReason}',
+                    style: PT.body(13, PT.error),
+                  ),
                 ),
               ],
               const SizedBox(height: 12),
@@ -448,6 +510,7 @@ class _LandlordTenantsScreenState extends State<LandlordTenantsScreen> {
                 PrimaryButton(
                   'Xác nhận bàn giao phòng',
                   outline: true,
+                  icon: LucideIcons.keyRound,
                   busy: f.busy,
                   onTap: f.busy
                       ? null
@@ -455,21 +518,23 @@ class _LandlordTenantsScreenState extends State<LandlordTenantsScreen> {
                           () => state.workflows.confirmHandover(r.id),
                         ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
               ],
               if (r.checkedIn && r.status == RentalStatus.active) ...[
                 PrimaryButton(
                   'Đánh giá người thuê',
                   outline: true,
+                  icon: LucideIcons.star,
                   onTap: () => openPage(
                     ctx,
                     ReviewScreen(state: state, rentalId: r.id),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
               ],
               PrimaryButton(
                 'Liên hệ người thuê',
+                icon: LucideIcons.messageSquare,
                 onTap: () {
                   final existing = state.conversations
                       .where(
@@ -1010,54 +1075,101 @@ class _LandlordSwapsScreenState extends State<LandlordSwapsScreen> {
                 state.roomById(s.roomId)?.title ?? s.roomId,
                 style: PT.title(19),
               ),
-              Text(state.store.workspaceById(s.tenantId).fullName),
+              const SizedBox(height: 4),
+              Text(
+                state.store.workspaceById(s.tenantId).fullName,
+                style: PT.body(14, PT.deep).copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
               Text(s.reason),
-              Text('${s.targetDistrict} • ${s.targetType} • ${s.budgetMax}đ'),
-              if (s.decisionNote.isNotEmpty) Text(s.decisionNote),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  Pill(s.targetDistrict, dense: true, color: PT.green),
+                  Pill(s.targetType, dense: true, color: PT.green),
+                  Pill('Ngân sách ≤ ${s.budgetMax}đ', dense: true, color: PT.green),
+                ],
+              ),
+              if (s.decisionNote.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(s.decisionNote, style: PT.body(13, PT.muted)),
+              ],
+              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(12),
-                decoration: PT.card(color: PT.mint),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: PT.mint.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: PT.green.withValues(alpha: 0.25)),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'So sánh người thuê chuyển đi & thay thế',
-                      style: PT.title(16),
+                    Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.arrowLeftRight,
+                          size: 16,
+                          color: PT.green,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'So sánh người thuê chuyển đi & thay thế',
+                            style: PT.title(15),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '• Chuyển đi: ${state.store.workspaceById(s.tenantId).fullName} (TrustScore: ${state.store.profiles[s.tenantId]?.trustScore ?? 91}/100 • ${state.store.workspaceById(s.tenantId).verification})',
-                      style: PT.body(13),
+                    const Divider(height: 16, color: PT.line),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          LucideIcons.arrowUpRight,
+                          size: 15,
+                          color: PT.muted,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Chuyển đi: ${state.store.workspaceById(s.tenantId).fullName} (TrustScore: ${state.store.profiles[s.tenantId]?.trustScore ?? 91}/100 • ${state.store.workspaceById(s.tenantId).verification})',
+                            style: PT.body(13),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Builder(
                       builder: (_) {
                         final prop = state.store.proposals
                             .where((p) => p.listingId == s.id)
                             .firstOrNull;
-                        if (prop != null) {
-                          final incomingName = state.store
-                              .workspaceById(prop.proposerId)
-                              .fullName;
-                          final incomingScore =
-                              state
-                                  .store
-                                  .profiles[prop.proposerId]
-                                  ?.trustScore ??
-                              90;
-                          final incomingVer = state.store
-                              .workspaceById(prop.proposerId)
-                              .verification;
-                          return Text(
-                            '• Chuyển đến: $incomingName (TrustScore: $incomingScore/100 • $incomingVer)',
-                            style: PT.body(13, PT.green),
-                          );
-                        }
-                        final candidate = state.people.firstOrNull;
-                        return Text(
-                          '• Ứng viên dự kiến: ${candidate?.name ?? 'Trần Gia Bảo'} (Hợp ${candidate?.match ?? 94}% • Đã xác minh CCCD)',
-                          style: PT.body(13, PT.green),
+                        final text = prop != null
+                            ? 'Chuyển đến: ${state.store.workspaceById(prop.proposerId).fullName} (TrustScore: ${state.store.profiles[prop.proposerId]?.trustScore ?? 90}/100 • ${state.store.workspaceById(prop.proposerId).verification})'
+                            : 'Ứng viên dự kiến: ${state.people.firstOrNull?.name ?? 'Trần Gia Bảo'} (Hợp ${state.people.firstOrNull?.match ?? 94}% • Đã xác minh CCCD)';
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              LucideIcons.arrowDownLeft,
+                              size: 15,
+                              color: PT.green,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                text,
+                                style: PT.body(13, PT.green).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),
@@ -1121,6 +1233,7 @@ class _LandlordSwapsScreenState extends State<LandlordSwapsScreen> {
                 const SizedBox(height: 8),
                 PrimaryButton(
                   'Duyệt yêu cầu',
+                  icon: LucideIcons.check,
                   busy: f.busy,
                   onTap: f.busy
                       ? null
@@ -1214,20 +1327,38 @@ class _LandlordReviewsScreenState extends State<LandlordReviewsScreen> {
 
         return [
           Container(
-            padding: const EdgeInsets.all(14),
-            decoration: PT.card(color: PT.mint),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: PT.line),
+            ),
             child: Wrap(
               spacing: 16,
-              runSpacing: 8,
+              runSpacing: 10,
               alignment: WrapAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Điểm trung bình', style: PT.body(12, PT.muted)),
-                    Text(
-                      '$avgRating ★ (${allReviews.length} đánh giá)',
-                      style: PT.title(20),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 22,
+                          color: PT.amber,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '$avgRating (${allReviews.length} đánh giá)',
+                            style: PT.title(20),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1235,9 +1366,10 @@ class _LandlordReviewsScreenState extends State<LandlordReviewsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Đã phản hồi', style: PT.body(12, PT.muted)),
+                    const SizedBox(height: 4),
                     Text(
                       '$repliedCount/${allReviews.length} nhận xét',
-                      style: PT.title(18),
+                      style: PT.title(18).copyWith(color: PT.green),
                     ),
                   ],
                 ),
@@ -1247,12 +1379,14 @@ class _LandlordReviewsScreenState extends State<LandlordReviewsScreen> {
           const SizedBox(height: 14),
           PrimaryButton(
             'Viết đánh giá người thuê',
+            icon: LucideIcons.penLine,
             onTap: () => openPage(ctx, ReviewScreen(state: s)),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           PrimaryButton(
             'Xem đánh giá nhận được / đã gửi',
             outline: true,
+            icon: LucideIcons.history,
             onTap: () => openPage(ctx, ReviewHistoryScreen(state: s)),
           ),
           const SizedBox(height: 14),
@@ -1272,22 +1406,49 @@ class _LandlordReviewsScreenState extends State<LandlordReviewsScreen> {
           const SizedBox(height: 14),
           for (final r in filtered)
             flowCard('${r.authorName} • ${r.rating}/5', [
-              Text(
-                'Vệ sinh ${r.cleanlinessRating}★ • Mô tả ${r.accuracyRating}★ • Giao tiếp ${r.communicationRating}★',
-                style: PT.body(12, PT.green),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  Pill(
+                    'Vệ sinh ${r.cleanlinessRating}/5',
+                    dense: true,
+                    color: PT.green,
+                  ),
+                  Pill(
+                    'Mô tả ${r.accuracyRating}/5',
+                    dense: true,
+                    color: PT.green,
+                  ),
+                  Pill(
+                    'Giao tiếp ${r.communicationRating}/5',
+                    dense: true,
+                    color: PT.green,
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
-              Text(r.comment),
-              Text(r.tags.join(' • ')),
-              Text('Hợp đồng: ${r.rentalId}'),
+              const SizedBox(height: 8),
+              Text(r.comment, style: PT.body(14)),
+              if (r.tags.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(r.tags.join(' • '), style: PT.body(12, PT.muted)),
+              ],
+              const SizedBox(height: 4),
+              Text('Hợp đồng: ${r.rentalId}', style: PT.body(12, PT.muted)),
               if (r.landlordReply != null) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: PT.card(color: PT.mint),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: PT.mint,
+                    borderRadius: BorderRadius.circular(12),
+                    border: const Border(
+                      left: BorderSide(color: PT.green, width: 3),
+                    ),
+                  ),
                   child: Text(
                     'Phản hồi của bạn: ${r.landlordReply}',
-                    style: PT.body(13),
+                    style: PT.body(13, PT.deep),
                   ),
                 ),
               ],
