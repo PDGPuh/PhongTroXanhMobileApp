@@ -33,13 +33,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
         )
         .toList();
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 4, bottom: 16),
+          padding: const EdgeInsets.only(top: 2, bottom: 10),
           child: Row(
             children: [
-              Expanded(child: Text('Tin nhắn', style: PT.title(28))),
+              Expanded(child: Text('Tin nhắn', style: PT.title(22))),
               RoundButton(
                 icon: LucideIcons.userRoundPlus,
                 label: 'Tin nhắn mới',
@@ -50,15 +50,15 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       shrinkWrap: true,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.all(18),
+                          padding: const EdgeInsets.all(16),
                           child: Text(
                             'Bắt đầu trò chuyện',
-                            style: PT.title(22),
+                            style: PT.title(20),
                           ),
                         ),
                         ...widget.state.people.map(
                           (p) => ListTile(
-                            leading: AvatarPhoto(kind: p.photo, size: 40),
+                            leading: AvatarPhoto(kind: p.photo, size: 38),
                             title: Text(p.name),
                             onTap: () {
                               Navigator.pop(context);
@@ -96,20 +96,20 @@ class _MessagesScreenState extends State<MessagesScreen> {
             onChanged: (v) => setState(() => query = v),
             decoration: InputDecoration(
               hintText: 'Tìm kiếm tin nhắn, tên hoặc nội dung...',
-              prefixIcon: const Icon(LucideIcons.search, size: 21),
+              prefixIcon: const Icon(LucideIcons.search, size: 19),
               fillColor: PT.grey,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(24),
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(24),
                 borderSide: BorderSide.none,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         if (conversations.isEmpty)
           const EmptyState(
             'Không tìm thấy hội thoại',
@@ -118,8 +118,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
         ...conversations.map(
           (c) => Container(
             margin: const EdgeInsets.only(bottom: 8),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: PT.line)),
+            decoration: PT.card(
+              color: c.unread > 0 ? const Color(0xFFF3FBF7) : Colors.white,
             ),
             child: Material(
               color: Colors.transparent,
@@ -133,30 +133,37 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   );
                 },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 10,
+                  ),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       AvatarPhoto(
                         kind: c.photo,
-                        size: 58,
+                        size: 46,
                         online: c.photo != PhotoKind.room,
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Wrap(
-                              spacing: 7,
+                              spacing: 6,
                               crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                Text(c.name, style: PT.title(17)),
+                                Text(c.name, style: PT.title(15)),
                                 if (c.host)
-                                  const Pill('Chủ trọ', color: PT.green),
+                                  const Pill(
+                                    'Chủ trọ',
+                                    color: PT.green,
+                                    dense: true,
+                                  ),
                               ],
                             ),
-                            const SizedBox(height: 5),
+                            const SizedBox(height: 3),
                             Text(
                               c.messages.isNotEmpty
                                   ? '${c.messages.last.delivery == MessageDelivery.failed
@@ -165,26 +172,26 @@ class _MessagesScreenState extends State<MessagesScreen> {
                                         ? 'Đang gửi: '
                                         : ''}${c.messages.last.text}'
                                   : c.subtitle,
-                              style: PT.body(14, PT.muted),
-                              maxLines: 2,
+                              style: PT.body(12, PT.muted),
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 6),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
                             c.messages.isEmpty ? c.time : c.messages.last.time,
-                            style: PT.body(12, PT.muted),
+                            style: PT.body(11, PT.muted),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 6),
                           if (c.unread > 0)
                             Container(
-                              width: 21,
-                              height: 21,
+                              width: 19,
+                              height: 19,
                               alignment: Alignment.center,
                               decoration: const BoxDecoration(
                                 color: PT.red,
@@ -192,13 +199,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               ),
                               child: Text(
                                 '${c.unread}',
-                                style: PT.body(12, Colors.white),
+                                style: PT.body(11, Colors.white),
                               ),
                             )
                           else
                             const Icon(
                               LucideIcons.checkCheck,
-                              size: 17,
+                              size: 16,
                               color: PT.green,
                             ),
                         ],
@@ -289,7 +296,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(8, 10, 13, 12),
+              padding: const EdgeInsets.fromLTRB(6, 6, 10, 6),
               decoration: const BoxDecoration(
                 border: Border(bottom: BorderSide(color: PT.line)),
               ),
@@ -297,15 +304,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   IconButton(
                     tooltip: 'Quay lại',
+                    visualDensity: VisualDensity.compact,
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(LucideIcons.arrowLeft),
                   ),
                   AvatarPhoto(
                     kind: widget.conversation.photo,
-                    size: 45,
+                    size: 38,
                     online: true,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,20 +322,22 @@ class _ChatScreenState extends State<ChatScreen> {
                           widget.conversation.participantName.isEmpty
                               ? widget.conversation.name
                               : widget.conversation.participantName,
-                          style: PT.title(17),
+                          style: PT.title(15),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Row(
                           children: [
                             Container(
-                              width: 8,
-                              height: 8,
+                              width: 7,
+                              height: 7,
                               decoration: const BoxDecoration(
                                 color: PT.green,
                                 shape: BoxShape.circle,
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                             Flexible(
                               child: Text(
                                 'Đang hoạt động',
@@ -342,6 +352,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   RoundButton(
                     icon: LucideIcons.phone,
                     label: 'Gọi điện',
+                    size: 34,
                     background: PT.mint,
                     onTap: () => message(
                       context,
@@ -390,7 +401,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 controller: scroll,
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(12, 13, 12, 16),
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                 children: [
                   if (widget.conversation.messages.isEmpty)
                     const EmptyState(
@@ -398,9 +409,40 @@ class _ChatScreenState extends State<ChatScreen> {
                       'Bắt đầu bằng một lời chào và chia sẻ nhu cầu của bạn.',
                       icon: LucideIcons.messageCircle,
                     ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final prompt in [
+                            'Phòng còn trống không ạ?',
+                            'Mình muốn hẹn xem phòng',
+                            'Chi phí điện nước thế nào?',
+                          ])
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Pill(
+                                prompt,
+                                icon: LucideIcons.sparkles,
+                                color: PT.green,
+                                bg: PT.mint,
+                                dense: true,
+                                onTap: () {
+                                  draft.text = prompt;
+                                  draft.selection = TextSelection.collapsed(
+                                    offset: prompt.length,
+                                  );
+                                },
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                   ...widget.conversation.messages.map(
                     (m) => Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.only(bottom: 9),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: m.mine
@@ -410,15 +452,15 @@ class _ChatScreenState extends State<ChatScreen> {
                           if (!m.mine) ...[
                             AvatarPhoto(
                               kind: widget.conversation.photo,
-                              size: 34,
+                              size: 30,
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 8),
                           ],
                           Flexible(
                             child: ConstrainedBox(
                               constraints: BoxConstraints(
                                 maxWidth:
-                                    MediaQuery.sizeOf(context).width * .76,
+                                    MediaQuery.sizeOf(context).width * .78,
                               ),
                               child: Column(
                                 crossAxisAlignment: m.mine
@@ -427,18 +469,18 @@ class _ChatScreenState extends State<ChatScreen> {
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 9,
+                                      horizontal: 11,
+                                      vertical: 7,
                                     ),
                                     decoration: BoxDecoration(
                                       color: m.mine ? PT.sage : PT.grey,
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Text(m.text, style: PT.body(14)),
+                                        Text(m.text, style: PT.body(13)),
                                         if (m.room &&
                                             widget.state.roomById(
                                                   m.roomId ??
@@ -448,7 +490,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                                       '',
                                                 ) !=
                                                 null) ...[
-                                          const SizedBox(height: 8),
+                                          const SizedBox(height: 6),
                                           SharedRoomCard(
                                             state: widget.state,
                                             room: widget.state.roomById(
@@ -464,10 +506,13 @@ class _ChatScreenState extends State<ChatScreen> {
                                   if (m.delivery == MessageDelivery.sending)
                                     Text(
                                       'Đang gửi…',
-                                      style: PT.body(12, PT.muted),
+                                      style: PT.body(11, PT.muted),
                                     ),
                                   if (m.delivery == MessageDelivery.failed)
                                     TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        visualDensity: VisualDensity.compact,
+                                      ),
                                       onPressed: () => widget.state.sendAsync(
                                         widget.conversation,
                                         m.text,
@@ -475,11 +520,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                       ),
                                       icon: const Icon(
                                         LucideIcons.rotateCcw,
-                                        size: 16,
+                                        size: 14,
                                       ),
                                       label: const Text('Chưa gửi • Thử lại'),
                                     ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 2),
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -488,7 +533,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                         style: PT.body(10, PT.muted),
                                       ),
                                       if (m.mine) ...[
-                                        const SizedBox(width: 6),
+                                        const SizedBox(width: 5),
                                         Icon(
                                           m.delivery == MessageDelivery.sending
                                               ? LucideIcons.clock
@@ -501,7 +546,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                                   MessageDelivery.failed
                                               ? PT.red
                                               : PT.green,
-                                          size: 14,
+                                          size: 13,
                                         ),
                                       ],
                                     ],
@@ -518,7 +563,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: const BoxDecoration(
                 color: Colors.white,
                 border: Border(top: BorderSide(color: PT.line)),
@@ -529,22 +574,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   RoundButton(
                     icon: LucideIcons.image,
                     label: 'Đính kèm',
+                    size: 36,
                     background: PT.mint,
                     onTap: () => showModalBottomSheet<void>(
                       context: context,
                       builder: (context) => SafeArea(
                         child: Padding(
-                          padding: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(16),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 'Chia sẻ trong hội thoại',
-                                style: PT.title(22),
+                                style: PT.title(20),
                               ),
-                              const SizedBox(height: 18),
+                              const SizedBox(height: 12),
                               SizedBox(
-                                height: 260,
+                                height: 220,
                                 child: ListView(
                                   children: [
                                     for (final selected
@@ -571,10 +617,10 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 8),
                               Text(
                                 'Chọn ảnh từ thiết bị sẽ được nối ở giai đoạn tích hợp.',
-                                style: PT.body(12, PT.muted),
+                                style: PT.body(11, PT.muted),
                               ),
                             ],
                           ),
@@ -587,17 +633,17 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: TextField(
                       controller: draft,
                       minLines: 1,
-                      maxLines: 4,
+                      maxLines: 3,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => send(),
                       decoration: InputDecoration(
                         hintText: 'Nhập tin nhắn...',
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                          horizontal: 14,
+                          vertical: 9,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(28),
+                          borderRadius: BorderRadius.circular(24),
                           borderSide: const BorderSide(color: PT.line),
                         ),
                       ),
@@ -607,7 +653,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   RoundButton(
                     icon: LucideIcons.send,
                     label: 'Gửi tin nhắn',
-                    size: 45,
+                    size: 40,
                     color: Colors.white,
                     background: PT.green,
                     onTap: sending || draft.text.trim().isEmpty ? null : send,

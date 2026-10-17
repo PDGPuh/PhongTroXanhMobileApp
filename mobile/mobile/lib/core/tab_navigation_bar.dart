@@ -30,7 +30,7 @@ class TabNavigationBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 6, 4, 7),
+          padding: const EdgeInsets.fromLTRB(4, 3, 4, 4),
           child: Stack(
             children: [
               Row(
@@ -45,8 +45,8 @@ class TabNavigationBar extends StatelessWidget {
                       excludeSemantics: true,
                       onTap: () => onSelected(i),
                       child: CupertinoButton(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        minimumSize: const Size(44, 42),
                         pressedOpacity: .65,
                         onPressed: () => onSelected(i),
                         child: TweenAnimationBuilder<double>(
@@ -69,19 +69,32 @@ class TabNavigationBar extends StatelessWidget {
                               children: [
                                 Stack(
                                   clipBehavior: Clip.none,
+                                  alignment: Alignment.center,
                                   children: [
-                                    Transform.scale(
-                                      scale: reduced ? 1 : 1 + .06 * value,
-                                      child: Icon(
-                                        icons[i],
-                                        color: color,
-                                        size: 24,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: PT.mint.withValues(
+                                          alpha: value * 0.9,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Transform.scale(
+                                        scale: reduced ? 1 : 1 + .07 * value,
+                                        child: Icon(
+                                          icons[i],
+                                          color: color,
+                                          size: 20,
+                                        ),
                                       ),
                                     ),
                                     if (unreadIndex == i)
                                       Positioned(
-                                        right: -3,
-                                        top: -2,
+                                        right: 6,
+                                        top: -1,
                                         child: Container(
                                           width: 7,
                                           height: 7,
@@ -93,12 +106,12 @@ class TabNavigationBar extends StatelessWidget {
                                       ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 3),
                                 SizedBox(
                                   height:
                                       MediaQuery.textScalerOf(context)
-                                          .scale(12) *
-                                      1.4 *
+                                          .scale(11.5) *
+                                      1.3 *
                                       labelLines,
                                   child: Text(
                                     labels[i],
@@ -109,7 +122,7 @@ class TabNavigationBar extends StatelessWidget {
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
-                                const SizedBox(height: 7.5),
+                                const SizedBox(height: 5),
                               ],
                             );
                           },
@@ -122,7 +135,7 @@ class TabNavigationBar extends StatelessWidget {
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 4,
+                bottom: 2,
                 height: 2.5,
                 child: IgnorePointer(
                   child: AnimatedAlign(

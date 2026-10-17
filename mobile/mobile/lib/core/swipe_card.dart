@@ -159,17 +159,24 @@ class SwipeCardState extends State<SwipeCard> with TickerProviderStateMixin {
             Positioned.fill(
               child: ExcludeSemantics(
                 child: IgnorePointer(
-                  child: Transform.scale(
-                    scale: _reducedMotion ? 1 : .96 + progress * .04,
-                    child: Opacity(
-                      opacity: .6 + progress * .4,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: OverflowBox(
-                          alignment: Alignment.topCenter,
-                          minHeight: 0,
-                          maxHeight: double.infinity,
-                          child: widget.next,
+                  child: RepaintBoundary(
+                    child: Transform.translate(
+                      offset: _reducedMotion
+                          ? Offset.zero
+                          : Offset(0, 8 * (1 - progress)),
+                      child: Transform.scale(
+                        scale: _reducedMotion ? 1 : .94 + progress * .06,
+                        child: Opacity(
+                          opacity: .68 + progress * .32,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: OverflowBox(
+                              alignment: Alignment.topCenter,
+                              minHeight: 0,
+                              maxHeight: double.infinity,
+                              child: widget.next,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -207,60 +214,79 @@ class SwipeCardState extends State<SwipeCard> with TickerProviderStateMixin {
                       scale: _arrivalScale,
                       child: AbsorbPointer(
                         absorbing: _exiting,
-                        child: Stack(
-                          children: [
-                            // Keep InkWell highlights in the moving card's
-                            // coordinate space instead of the page Material.
-                            Material(
-                              type: MaterialType.transparency,
-                              child: widget.child,
-                            ),
-                            if (progress > 0)
-                              Positioned(
-                                top: 60,
-                                left: positive ? 18 : null,
-                                right: positive ? null : 18,
-                                child: IgnorePointer(
-                                  child: ExcludeSemantics(
-                                    child: Opacity(
-                                      opacity: progress,
-                                      child: Transform.rotate(
-                                        angle:
-                                            (positive ? -1 : 1) * math.pi / 24,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 8,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withValues(
-                                              alpha: .96,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                            border: Border.all(
-                                              color: color,
-                                              width: 2,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            positive
-                                                ? widget.positiveLabel
-                                                : 'BỎ QUA',
-                                            style: PT
-                                                .body(20, color)
-                                                .copyWith(
-                                                  fontWeight: FontWeight.w800,
+                        child: RepaintBoundary(
+                          child: Stack(
+                            children: [
+                              // Keep InkWell highlights in the moving card's
+                              // coordinate space instead of the page Material.
+                              Material(
+                                type: MaterialType.transparency,
+                                child: widget.child,
+                              ),
+                              if (progress > 0)
+                                Positioned(
+                                  top: 56,
+                                  left: positive ? 18 : null,
+                                  right: positive ? null : 18,
+                                  child: IgnorePointer(
+                                    child: ExcludeSemantics(
+                                      child: Opacity(
+                                        opacity: progress,
+                                        child: Transform.scale(
+                                          scale: _reducedMotion
+                                              ? 1
+                                              : 0.85 + 0.18 * progress,
+                                          child: Transform.rotate(
+                                            angle:
+                                                (positive ? -1 : 1) *
+                                                math.pi /
+                                                22,
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 8,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withValues(
+                                                  alpha: .96,
                                                 ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: color,
+                                                  width: 2.2,
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: color.withValues(
+                                                      alpha: .18,
+                                                    ),
+                                                    blurRadius: 12,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Text(
+                                                positive
+                                                    ? widget.positiveLabel
+                                                    : 'BỎ QUA',
+                                                style: PT
+                                                    .body(20, color)
+                                                    .copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                    ),
+                                              ),
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

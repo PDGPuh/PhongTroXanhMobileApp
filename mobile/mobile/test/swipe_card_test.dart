@@ -300,6 +300,19 @@ void main() {
       tester
           .state<ScrollableState>(find.byType(Scrollable).first)
           .position
+          .maxScrollExtent,
+      0,
+    );
+    tester.view.physicalSize = const Size(390, 460);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(SwipeCard), const Offset(0, -250));
+    await tester.pumpAndSettle();
+    expect(state.roomIndex, 0);
+    expect(state.saved, isEmpty);
+    expect(
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
           .pixels,
       greaterThan(0),
     );

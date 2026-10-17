@@ -238,32 +238,97 @@ class _PhongTroXanhAppState extends State<PhongTroXanhApp> {
     ),
     debugShowCheckedModeBanner: false,
     theme: PT.theme,
-    builder: (context, child) => ColoredBox(
-      color: const Color(0xFFF2F6F4),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 430),
-          child: LayoutBuilder(
-            builder: (context, c) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(size: Size(math.min(c.maxWidth, 430), c.maxHeight)),
-              child: AppScope(
-                state: state,
-                requestLogin: requestLogin,
-                logout: logout,
-                child: child!,
+    builder: (context, child) => LayoutBuilder(
+      builder: (context, outer) {
+        final isDesktopFrame = outer.maxWidth > 520 && outer.maxHeight > 560;
+        if (!isDesktopFrame) {
+          return ColoredBox(
+            color: const Color(0xFFF2F6F4),
+            child: SizedBox(
+              width: outer.maxWidth,
+              height: outer.maxHeight,
+              child: MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(size: Size(outer.maxWidth, outer.maxHeight)),
+                child: AppScope(
+                  state: state,
+                  requestLogin: requestLogin,
+                  logout: logout,
+                  child: child!,
+                ),
+              ),
+            ),
+          );
+        }
+        final phoneWidth = math.min(outer.maxWidth - 32, 412.0);
+        final phoneHeight = (outer.maxHeight - 20).clamp(560.0, 900.0);
+        return ColoredBox(
+          color: const Color(0xFFDCE7E1),
+          child: Center(
+            child: Container(
+              width: phoneWidth + 12,
+              height: phoneHeight + 12,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16241E),
+                borderRadius: BorderRadius.circular(36),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33071A12),
+                    blurRadius: 32,
+                    offset: Offset(0, 14),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    size: Size(phoneWidth, phoneHeight),
+                    padding: const EdgeInsets.only(top: 6),
+                    viewPadding: const EdgeInsets.only(top: 6),
+                  ),
+                  child: AppScope(
+                    state: state,
+                    requestLogin: requestLogin,
+                    logout: logout,
+                    child: child!,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     ),
     onGenerateInitialRoutes: (initialRoute) => [
       MaterialPageRoute<void>(
-        builder: (_) => ListenableBuilder(
+        builder: (context) => ListenableBuilder(
           listenable: Listenable.merge([state, mode]),
-          builder: (_, _) => home(),
+          builder: (context, _) {
+            final reduced = MediaQuery.disableAnimationsOf(context);
+            return AnimatedSwitcher(
+              duration: reduced
+                  ? Duration.zero
+                  : const Duration(milliseconds: 240),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.985, end: 1.0).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                  child: child,
+                ),
+              ),
+              child: KeyedSubtree(key: ValueKey(mode.value), child: home()),
+            );
+          },
         ),
       ),
       if (initialPath(initialRoute) != '/')
