@@ -194,28 +194,33 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
             ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             for (var i = 0; i < slides.length; i++)
-              IconButton(
-                tooltip: 'Giới thiệu ${i + 1}',
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.all(2),
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 24),
-                onPressed: () => controller.animateToPage(
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => controller.animateToPage(
                   i,
                   duration: const Duration(milliseconds: 250),
                   curve: Curves.easeOut,
                 ),
-                icon: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: i == index ? 20 : 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: i == index ? PT.green : PT.line,
-                    borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 6,
+                  ),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: i == index ? 24 : 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: i == index
+                          ? PT.green
+                          : PT.green.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),

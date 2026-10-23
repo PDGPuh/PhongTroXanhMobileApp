@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../api/http_admin_repository.dart';
 import '../../app/app_state.dart';
 import '../../app/navigation.dart';
 import '../../core/flow_page.dart';
@@ -22,6 +23,922 @@ class AdminScreen extends StatefulWidget {
 
 class _AdminScreenState extends State<AdminScreen> {
   int analyticsTab = 0;
+  String reviewScope = 'SYSTEM'; // 'LANDLORD' or 'SYSTEM'
+  int? selectedStarFilter;
+  AdminDashboardData? _liveDashboard;
+  bool _loadingDashboard = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.state.adminRepository.hasAuthToken) {
+      _refreshDashboard();
+    }
+  }
+
+  Future<void> _refreshDashboard() async {
+    if (_loadingDashboard || !mounted) return;
+    setState(() => _loadingDashboard = true);
+    try {
+      final res = await widget.state.adminRepository.getDashboard();
+      if (mounted) {
+        setState(() {
+          _liveDashboard = res;
+          _loadingDashboard = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingDashboard = false);
+      }
+    }
+  }
+
+  String _formatVnd(num amount) {
+    final v = amount.round();
+    if (v >= 1000000) {
+      return '${(v / 1000000).toStringAsFixed(2)}tr đ';
+    }
+    if (v >= 1000) {
+      return '${(v / 1000).round()}k đ';
+    }
+    return '$v đ';
+  }
+
+  String _formatCategoryLabel(String cat) => switch (cat.toUpperCase()) {
+    'UI_UX' => 'Giao diện (UI/UX)',
+    'BUG' => 'Báo lỗi',
+    'FEATURE' => 'Tính năng',
+    'PERFORMANCE' => 'Hiệu năng',
+    _ => 'Góp ý chung',
+  };
+
+  AdminDashboardData _buildDemoDashboard(AppState state) {
+    final profiles = state.store.profiles.values
+        .where((p) => !state.store.deleted.contains(p.user.id))
+        .toList();
+    final totalUsers = profiles.length;
+    final totalLandlords = profiles
+        .where((p) => p.user.role == UserRole.landlord)
+        .length;
+    final totalTenants = profiles
+        .where((p) => p.user.role == UserRole.tenant)
+        .length;
+    final verifiedUsersCount = profiles
+        .where(
+          (p) =>
+              state.store.workspace(p.user).verification == 'Đã xác minh' ||
+              p.user.role != UserRole.tenant,
+        )
+        .length;
+
+    final totalRooms = state.rooms.length;
+    final activeRooms = state.rooms
+        .where((r) => r.status == RoomStatus.available)
+        .length;
+    final pendingRooms = state.rooms
+        .where((r) => r.status == RoomStatus.pending)
+        .length;
+    final hiddenRooms = state.rooms
+        .where((r) => r.status == RoomStatus.hidden)
+        .length;
+    final rentedRooms = math.max(
+      0,
+      totalRooms - activeRooms - pendingRooms - hiddenRooms,
+    );
+    final boostedRooms = state.rooms.where((r) => r.isBoosted).length;
+
+    final totalRentals = state.store.rentals.length;
+    final activeRentals = state.store.rentals
+        .where((r) => r.status == RentalStatus.active)
+        .length;
+
+    final pendingKyc = state.store.kyc
+        .where((k) => k.status == 'Chờ duyệt')
+        .length;
+    final approvedKyc =
+        state.store.kyc.where((k) => k.status == 'Đã xác minh').length + 14;
+    final rejectedKyc =
+        state.store.kyc.where((k) => k.status == 'Đã từ chối').length + 2;
+    final totalKyc = pendingKyc + approvedKyc + rejectedKyc;
+    final kycApprovalRate = totalKyc == 0
+        ? 92.0
+        : (approvedKyc * 100.0 / totalKyc);
+
+    final pendingDisputes = state.store.reviewRecords
+        .where((r) => r.disputeStatus == 'Chờ xử lý')
+        .length;
+    final pendingReports = state.store.reports
+        .where((r) => r.status == 'Chờ xử lý')
+        .length;
+
+    final paidOrders = state.store.orders
+        .where((o) => o.status == 'Thành công')
+        .toList();
+    final orderRevenue = paidOrders.fold<int>(0, (s, o) => s + o.amount);
+    final totalRevenue = (14850000 + orderRevenue).toDouble();
+    final totalTransactions = 28 + paidOrders.length;
+
+    final matchPairs =
+        18 +
+        state.store.matches.values.fold<int>(0, (s, set) => s + set.length);
+    final totalSwipes =
+        245 +
+        profiles.fold<int>(
+          0,
+          (s, p) =>
+              s +
+              state.store.workspace(p.user).saved.length +
+              state.store.workspace(p.user).liked.length,
+        );
+    final totalSwapRequests = 6 + state.store.swaps.length;
+
+    final recentReviews = <AdminRecentReview>[
+      for (final r in state.store.reviewRecords.reversed)
+        AdminRecentReview(
+          id: r.id,
+          reviewerName: r.authorName,
+          reviewerRole: r.targetType == 'ROOM' ? 'TENANT' : 'LANDLORD',
+          landlordName:
+              state.roomById(r.targetId)?.landlordName ?? 'Chủ trọ PTX',
+          isVerifiedStay: true,
+          rating: r.rating,
+          comment: r.comment,
+          landlordReply: r.landlordReply,
+          repliedAt: r.repliedAt?.toIso8601String(),
+          roomTitle:
+              state.roomById(r.targetId)?.title ?? 'Phòng trọ ${r.targetId}',
+          createdAt: r.createdAt.toIso8601String().substring(0, 10),
+        ),
+      const AdminRecentReview(
+        id: 'rev-demo-1',
+        reviewerName: 'Nguyễn Hoài An',
+        reviewerRole: 'TENANT',
+        landlordName: 'Cô Hồng',
+        isVerifiedStay: true,
+        rating: 5,
+        comment:
+            'Phòng sạch thoáng đúng ảnh thực tế, chủ nhà hỗ trợ nhận phòng bằng QR rất nhanh.',
+        landlordReply: 'Cảm ơn An đã giữ phòng sạch sẽ và đóng tiền đúng hạn!',
+        repliedAt: '2026-10-14',
+        roomTitle: 'Studio xanh gần Bách Khoa',
+        createdAt: '2026-10-14',
+      ),
+      const AdminRecentReview(
+        id: 'rev-demo-2',
+        reviewerName: 'Lê Thu Hà',
+        reviewerRole: 'TENANT',
+        landlordName: 'Nguyễn Văn Hùng',
+        isVerifiedStay: true,
+        rating: 4,
+        comment:
+            'An ninh vân tay rất yên tâm, khu vực Thảo Điền yên tĩnh phù hợp làm việc.',
+        roomTitle: 'Căn hộ mini Thảo Điền có ban công',
+        createdAt: '2026-10-12',
+      ),
+    ];
+
+    final avgLandlordRating = recentReviews.isEmpty
+        ? 4.8
+        : recentReviews.fold<int>(0, (s, r) => s + r.rating) /
+              recentReviews.length;
+
+    final sysFeedbacks = <AdminSystemFeedback>[
+      for (final fb in state.store.systemFeedbacks)
+        AdminSystemFeedback(
+          id: fb.id,
+          userId: fb.id,
+          userName: fb.authorName,
+          userRole: fb.roleLabel == 'Chủ trọ' ? 'LANDLORD' : 'TENANT',
+          rating: fb.rating,
+          category: fb.id == 'fb-1'
+              ? 'UI_UX'
+              : fb.id == 'fb-2'
+              ? 'FEATURE'
+              : 'PERFORMANCE',
+          comment: fb.comment,
+          createdAt: fb.createdAt.toIso8601String().substring(0, 10),
+        ),
+    ];
+
+    final ratingDist = <AdminRatingBreakdown>[
+      for (final star in [5, 4, 3, 2, 1])
+        () {
+          final cnt = recentReviews.where((r) => r.rating == star).length;
+          final pct = recentReviews.isEmpty
+              ? 0.0
+              : (cnt * 100.0 / recentReviews.length);
+          return AdminRatingBreakdown(star: star, count: cnt, percentage: pct);
+        }(),
+    ];
+
+    final pkgStats = <AdminPackageStat>[
+      const AdminPackageStat(
+        planId: 'LANDLORD_PRO',
+        planName: 'Gói Chủ Trọ Chuyên Nghiệp',
+        revenue: 6450000,
+        count: 11,
+      ),
+      const AdminPackageStat(
+        planId: 'LANDLORD_VIP',
+        planName: 'Gói Chủ Trọ VIP',
+        revenue: 4280000,
+        count: 9,
+      ),
+      const AdminPackageStat(
+        planId: 'VIP_TENANT',
+        planName: 'Gói VIP Ghép Đôi Siêu Tốc',
+        revenue: 2650000,
+        count: 8,
+      ),
+      AdminPackageStat(
+        planId: 'PRO_TENANT',
+        planName: 'Gói Pro Tìm Bạn & Thuê Phòng',
+        revenue: (1470000 + orderRevenue).toDouble(),
+        count: 6 + paidOrders.length,
+      ),
+    ];
+
+    return AdminDashboardData(
+      totalUsers: totalUsers,
+      totalLandlords: totalLandlords,
+      totalTenants: totalTenants,
+      totalRooms: totalRooms,
+      activeRooms: activeRooms,
+      totalMatches: matchPairs,
+      totalRentals: totalRentals,
+      activeRentals: activeRentals,
+      pendingKycCount: pendingKyc,
+      pendingDisputesCount: pendingDisputes,
+      totalRevenue: totalRevenue,
+      totalTransactions: totalTransactions,
+      totalReviews: recentReviews.length,
+      averageRating: avgLandlordRating,
+      landlordAverageRating: avgLandlordRating,
+      verifiedUsersCount: verifiedUsersCount,
+      pendingReportsCount: pendingReports,
+      totalSwipes: totalSwipes,
+      totalSwapRequests: totalSwapRequests,
+      activeBoostedRooms: boostedRooms,
+      monthlyStats: [
+        const AdminMonthlyStat(
+          month: '05/2026',
+          newUsers: 18,
+          newRentals: 6,
+          revenue: 1650000,
+        ),
+        const AdminMonthlyStat(
+          month: '06/2026',
+          newUsers: 24,
+          newRentals: 9,
+          revenue: 2150000,
+        ),
+        const AdminMonthlyStat(
+          month: '07/2026',
+          newUsers: 31,
+          newRentals: 12,
+          revenue: 2540000,
+        ),
+        const AdminMonthlyStat(
+          month: '08/2026',
+          newUsers: 39,
+          newRentals: 15,
+          revenue: 2890000,
+        ),
+        const AdminMonthlyStat(
+          month: '09/2026',
+          newUsers: 46,
+          newRentals: 19,
+          revenue: 3120000,
+        ),
+        AdminMonthlyStat(
+          month: '10/2026',
+          newUsers: 54 + totalUsers,
+          newRentals: 22 + activeRentals,
+          revenue: (2500000 + orderRevenue).toDouble(),
+        ),
+      ],
+      trustScoreDistribution: const [
+        AdminTrustScoreRange(
+          range: '90-100 (Uy tín cao)',
+          count: 42,
+          percentage: 46.7,
+        ),
+        AdminTrustScoreRange(
+          range: '70-89 (Tốt)',
+          count: 31,
+          percentage: 34.4,
+        ),
+        AdminTrustScoreRange(
+          range: '50-69 (Cơ bản)',
+          count: 14,
+          percentage: 15.6,
+        ),
+        AdminTrustScoreRange(
+          range: '<50 (Cần lưu ý)',
+          count: 3,
+          percentage: 3.3,
+        ),
+      ],
+      ratingDistribution: ratingDist,
+      recentReviews: recentReviews,
+      systemFeedbacks: sysFeedbacks,
+      packageStats: pkgStats,
+      roomTypeDistribution: const [
+        AdminCategoryStat(name: 'Studio', count: 18, percentage: 42.0),
+        AdminCategoryStat(name: 'Căn hộ mini', count: 12, percentage: 28.0),
+        AdminCategoryStat(name: 'Phòng đơn', count: 8, percentage: 19.0),
+        AdminCategoryStat(name: 'Ở ghép / KTX', count: 5, percentage: 11.0),
+      ],
+      districtDistribution: const [
+        AdminCategoryStat(name: 'Quận 10', count: 16, percentage: 38.0),
+        AdminCategoryStat(name: 'Thủ Đức', count: 13, percentage: 31.0),
+        AdminCategoryStat(name: 'Bình Thạnh', count: 8, percentage: 19.0),
+        AdminCategoryStat(name: 'Quận 7', count: 5, percentage: 12.0),
+      ],
+      roomStatusDistribution: [
+        AdminCategoryStat(
+          name: 'Đang hiển thị',
+          count: activeRooms,
+          percentage: totalRooms == 0
+              ? 0
+              : (activeRooms * 100.0 / totalRooms),
+        ),
+        AdminCategoryStat(
+          name: 'Chờ duyệt',
+          count: pendingRooms,
+          percentage: totalRooms == 0
+              ? 0
+              : (pendingRooms * 100.0 / totalRooms),
+        ),
+        AdminCategoryStat(
+          name: 'Đã ẩn',
+          count: hiddenRooms,
+          percentage: totalRooms == 0 ? 0 : (hiddenRooms * 100.0 / totalRooms),
+        ),
+        AdminCategoryStat(
+          name: 'Đã thuê',
+          count: rentedRooms,
+          percentage: totalRooms == 0 ? 0 : (rentedRooms * 100.0 / totalRooms),
+        ),
+      ],
+      lifestyleStats: const [
+        AdminCategoryStat(
+          name: 'Không hút thuốc',
+          count: 78,
+          percentage: 86.5,
+        ),
+        AdminCategoryStat(
+          name: 'Gọn gàng, sạch sẽ',
+          count: 74,
+          percentage: 82.0,
+        ),
+        AdminCategoryStat(
+          name: 'Ngủ trước 23h',
+          count: 61,
+          percentage: 68.0,
+        ),
+        AdminCategoryStat(
+          name: 'Cho bạn bè tới chơi',
+          count: 39,
+          percentage: 43.5,
+        ),
+      ],
+      personalizationFunnel: [
+        const AdminCategoryStat(
+          name: 'Người thuê đăng ký',
+          count: 120,
+          percentage: 100.0,
+        ),
+        const AdminCategoryStat(
+          name: 'Đã xác thực CCCD',
+          count: 94,
+          percentage: 78.3,
+        ),
+        AdminCategoryStat(
+          name: 'Ghép đôi thành công',
+          count: 52 + matchPairs,
+          percentage: 58.3,
+        ),
+        AdminCategoryStat(
+          name: 'Ký hợp đồng thuê',
+          count: 34 + activeRentals,
+          percentage: 31.0,
+        ),
+      ],
+      districtSupplyDemand: const [
+        AdminDistrictSupplyDemand(district: 'Quận 10', supply: 28, demand: 42),
+        AdminDistrictSupplyDemand(district: 'Thủ Đức', supply: 34, demand: 39),
+        AdminDistrictSupplyDemand(
+          district: 'Bình Thạnh',
+          supply: 22,
+          demand: 31,
+        ),
+        AdminDistrictSupplyDemand(district: 'Quận 7', supply: 19, demand: 24),
+        AdminDistrictSupplyDemand(district: 'Quận 3', supply: 14, demand: 21),
+      ],
+      kycOverview: AdminKycOverview(
+        pendingCount: pendingKyc,
+        approvedCount: approvedKyc,
+        rejectedCount: rejectedKyc,
+        approvalRate: kycApprovalRate,
+      ),
+    );
+  }
+
+  void _showReviewDetailDialog(
+    BuildContext context,
+    AppState state, {
+    AdminRecentReview? landlordReview,
+    AdminSystemFeedback? systemFeedback,
+  }) {
+    final isLandlord = landlordReview != null;
+    final authorName = isLandlord
+        ? landlordReview.reviewerName
+        : (systemFeedback?.userName ?? 'Người dùng');
+    final roleCode = isLandlord
+        ? landlordReview.reviewerRole
+        : (systemFeedback?.userRole ?? 'TENANT');
+    final rating = isLandlord
+        ? landlordReview.rating
+        : (systemFeedback?.rating ?? 5);
+    final comment = isLandlord
+        ? landlordReview.comment
+        : (systemFeedback?.comment ?? '');
+    final createdAt = isLandlord
+        ? landlordReview.createdAt
+        : (systemFeedback?.createdAt ?? '');
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          isLandlord
+              ? 'Chi tiết Đánh giá Chủ trọ'
+              : 'Chi tiết Đánh giá Hệ thống',
+          style: PT.title(16),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(authorName, style: PT.title(14)),
+                  Pill(
+                    roleCode == 'LANDLORD' ? 'Chủ trọ' : 'Người thuê',
+                    dense: true,
+                    color: roleCode == 'LANDLORD'
+                        ? const Color(0xFF0799DE)
+                        : PT.green,
+                  ),
+                  if (isLandlord && landlordReview.isVerifiedStay)
+                    const Pill('Đã thuê thực tế', dense: true, color: PT.green),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  for (var i = 1; i <= 5; i++)
+                    Icon(
+                      LucideIcons.star,
+                      size: 14,
+                      color: i <= rating ? PT.amber : PT.line,
+                    ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '$rating/5 sao • $createdAt',
+                      style: PT.body(11, PT.muted),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (isLandlord)
+                Text(
+                  'Phòng: ${landlordReview.roomTitle} • Chủ trọ: ${landlordReview.landlordName}',
+                  style: PT.body(12, PT.green).copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else if (systemFeedback != null)
+                Text(
+                  'Danh mục: ${_formatCategoryLabel(systemFeedback.category)}',
+                  style: PT.body(12, PT.green).copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: PT.grey.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(comment, style: PT.body(13, PT.deep)),
+              ),
+              if (isLandlord &&
+                  landlordReview.landlordReply != null &&
+                  landlordReview.landlordReply!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: PT.mint,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Phản hồi từ Chủ trọ (${landlordReview.landlordName}):',
+                        style: PT.body(11, PT.green).copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        landlordReview.landlordReply!,
+                        style: PT.body(12, PT.deep),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          if (!isLandlord && systemFeedback != null)
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await state.workflows.deleteSystemFeedback(systemFeedback.id);
+              },
+              child: Text('Xóa phản hồi', style: PT.body(13, PT.error)),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAllReviewsModal(
+    BuildContext context,
+    AppState state,
+    AdminDashboardData dashboard,
+  ) {
+    String modalScope = reviewScope;
+    int? modalStar = selectedStarFilter;
+    String modalRole = 'ALL';
+    String modalCategory = 'ALL';
+    String searchQuery = '';
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setModalState) {
+          final isLandlord = modalScope == 'LANDLORD';
+          final filteredLandlord = dashboard.recentReviews.where((r) {
+            final starOk = modalStar == null || r.rating == modalStar;
+            final roleOk = modalRole == 'ALL' || r.reviewerRole == modalRole;
+            final q = searchQuery.trim().toLowerCase();
+            final qOk =
+                q.isEmpty ||
+                r.reviewerName.toLowerCase().contains(q) ||
+                r.landlordName.toLowerCase().contains(q) ||
+                r.comment.toLowerCase().contains(q) ||
+                r.roomTitle.toLowerCase().contains(q);
+            return starOk && roleOk && qOk;
+          }).toList();
+
+          final filteredSystem = dashboard.systemFeedbacks.where((f) {
+            final starOk = modalStar == null || f.rating == modalStar;
+            final roleOk = modalRole == 'ALL' || f.userRole == modalRole;
+            final catOk =
+                modalCategory == 'ALL' ||
+                f.category.toUpperCase() == modalCategory;
+            final q = searchQuery.trim().toLowerCase();
+            final qOk =
+                q.isEmpty ||
+                f.userName.toLowerCase().contains(q) ||
+                f.comment.toLowerCase().contains(q);
+            return starOk && roleOk && catOk && qOk;
+          }).toList();
+
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.82,
+            minChildSize: 0.5,
+            maxChildSize: 0.94,
+            builder: (_, scrollCtrl) => Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: ListView(
+                controller: scrollCtrl,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Quản lý Đánh giá & Phản hồi Hệ thống',
+                          style: PT.title(16),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetCtx),
+                        icon: const Icon(LucideIcons.x, size: 18),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      ChoiceChip(
+                        label: Text(
+                          'Đánh giá Chủ trọ (${dashboard.recentReviews.length})',
+                        ),
+                        selected: isLandlord,
+                        onSelected: (_) =>
+                            setModalState(() => modalScope = 'LANDLORD'),
+                      ),
+                      ChoiceChip(
+                        label: Text(
+                          'Phản hồi Hệ thống (${dashboard.systemFeedbacks.length})',
+                        ),
+                        selected: !isLandlord,
+                        onSelected: (_) =>
+                            setModalState(() => modalScope = 'SYSTEM'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'Tìm theo tên người gửi, phòng hoặc nội dung',
+                      prefixIcon: Icon(LucideIcons.search, size: 18),
+                      isDense: true,
+                    ),
+                    onChanged: (v) => setModalState(() => searchQuery = v),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Mọi số sao'),
+                        selected: modalStar == null,
+                        onSelected: (_) =>
+                            setModalState(() => modalStar = null),
+                      ),
+                      for (final s in [5, 4, 3, 2, 1])
+                        ChoiceChip(
+                          label: Text('$s ★'),
+                          selected: modalStar == s,
+                          onSelected: (_) => setModalState(
+                            () => modalStar = modalStar == s ? null : s,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final roleOpt in const [
+                        ('ALL', 'Mọi vai trò'),
+                        ('TENANT', 'Người thuê'),
+                        ('LANDLORD', 'Chủ trọ'),
+                      ])
+                        ChoiceChip(
+                          label: Text(roleOpt.$2),
+                          selected: modalRole == roleOpt.$1,
+                          onSelected: (_) =>
+                              setModalState(() => modalRole = roleOpt.$1),
+                        ),
+                    ],
+                  ),
+                  if (!isLandlord) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final catOpt in const [
+                          ('ALL', 'Mọi danh mục'),
+                          ('GENERAL', 'Góp ý chung'),
+                          ('UI_UX', 'Giao diện'),
+                          ('BUG', 'Báo lỗi'),
+                          ('FEATURE', 'Tính năng'),
+                          ('PERFORMANCE', 'Hiệu năng'),
+                        ])
+                          ChoiceChip(
+                            label: Text(catOpt.$2),
+                            selected: modalCategory == catOpt.$1,
+                            onSelected: (_) =>
+                                setModalState(() => modalCategory = catOpt.$1),
+                          ),
+                      ],
+                    ),
+                  ],
+                  const Divider(height: 20, color: PT.line),
+                  if (isLandlord && filteredLandlord.isEmpty)
+                    const EmptyState(
+                      'Không có đánh giá phù hợp',
+                      'Thử thay đổi bộ lọc số sao hoặc từ khóa tìm kiếm.',
+                    ),
+                  if (!isLandlord && filteredSystem.isEmpty)
+                    const EmptyState(
+                      'Không có phản hồi hệ thống phù hợp',
+                      'Thử thay đổi bộ lọc danh mục hoặc từ khóa tìm kiếm.',
+                    ),
+                  if (isLandlord)
+                    for (final item in filteredLandlord)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => _showReviewDetailDialog(
+                            context,
+                            state,
+                            landlordReview: item,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: PT.card(radius: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      item.reviewerName,
+                                      style: PT.title(13),
+                                    ),
+                                    Pill(
+                                      '${item.rating} ★',
+                                      dense: true,
+                                      color: PT.amber,
+                                    ),
+                                    if (item.isVerifiedStay)
+                                      const Pill(
+                                        'Đã thuê thực tế',
+                                        dense: true,
+                                        color: PT.green,
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(item.comment, style: PT.body(12, PT.deep)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${item.roomTitle} • Chủ trọ: ${item.landlordName}',
+                                  style: PT.body(11, PT.muted),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  if (!isLandlord)
+                    for (final fb in filteredSystem)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: PT.card(radius: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(fb.userName, style: PT.title(13)),
+                                  Pill(
+                                    '${fb.rating} ★',
+                                    dense: true,
+                                    color: PT.amber,
+                                  ),
+                                  Pill(
+                                    _formatCategoryLabel(fb.category),
+                                    dense: true,
+                                    color: PT.green,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(fb.comment, style: PT.body(12, PT.deep)),
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: InkWell(
+                                  onTap: () async {
+                                    Navigator.pop(sheetCtx);
+                                    await state.workflows.deleteSystemFeedback(
+                                      fb.id,
+                                    );
+                                  },
+                                  child: Text(
+                                    'Xóa phản hồi',
+                                    style: PT.body(11, PT.error).copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  TextStyle _tabular(TextStyle base) => base.copyWith(
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
+
+  Widget _adminSectionCard(
+    String title,
+    List<Widget> children, {
+    String? subtitle,
+    Widget? trailing,
+  }) => Container(
+    padding: const EdgeInsets.all(18),
+    margin: const EdgeInsets.only(bottom: 16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: PT.line.withValues(alpha: 0.85)),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0A073B3C),
+          blurRadius: 16,
+          offset: Offset(0, 6),
+        ),
+      ],
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: PT.title(16)),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 3),
+                      Text(subtitle, style: PT.body(12, PT.muted)),
+                    ],
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 8),
+                trailing,
+              ],
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -29,596 +946,1620 @@ class _AdminScreenState extends State<AdminScreen> {
     return ListenableBuilder(
       listenable: state,
       builder: (context, _) {
-        final paidOrders = state.store.orders
-            .where((o) => o.status == 'Thành công')
-            .toList();
-        final orderRevenue = paidOrders.fold<int>(0, (s, o) => s + o.amount);
-        final totalRevenue = 14850000 + orderRevenue;
+        final dashboard = _liveDashboard ?? _buildDemoDashboard(state);
         final vipCount = state.store.profiles.values
             .where((p) => p.package != 'Miễn phí')
             .length;
-        final boostedRooms = state.rooms.where((r) => r.isBoosted).length;
-        final feedbacks = state.store.systemFeedbacks;
-        final avgSatisfaction = feedbacks.isEmpty
-            ? '4.8'
-            : (feedbacks.map((f) => f.rating).reduce((a, b) => a + b) /
-                      feedbacks.length)
-                  .toStringAsFixed(1);
+        final occupancyRate = dashboard.totalRooms > 0
+            ? math.min(
+                100,
+                ((dashboard.activeRentals * 100) / dashboard.totalRooms)
+                    .round(),
+              )
+            : 0;
+        final pendingTotalActions =
+            dashboard.pendingKycCount +
+            dashboard.pendingDisputesCount +
+            dashboard.pendingReportsCount;
 
-        return LayoutBuilder(
-          builder: (context, viewport) {
-            final textScale = MediaQuery.textScalerOf(context).scale(1);
-            final lockScroll = viewport.maxHeight >= 520 && textScale <= 1.25;
-            final minContentHeight = lockScroll
-                ? math.max(0.0, viewport.maxHeight - 8)
-                : 0.0;
-            final showExtraGrowth =
-                lockScroll && viewport.maxHeight >= 680 && analyticsTab == 0;
-            return ListView(
-              physics: lockScroll
-                  ? const NeverScrollableScrollPhysics()
-                  : const ClampingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-              children: [
-                ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: minContentHeight),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Header(
-                            admin: true,
-                            unreadNotifications: state.unreadNotifications,
-                            onMap: () => openPage(
-                              context,
-                              AdminUsersScreen(state: state),
-                            ),
-                            onNotifications: () => openPage(
-                              context,
-                              NotificationsScreen(state: state),
-                            ),
-                          ),
-                          const PageHeading(
-                            'Quản trị viên',
-                            'Tổng quan hệ thống Phòng Trọ Xanh',
-                          ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 9,
-                  ),
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [PT.deep, Color(0xFF0A4F48)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x18073B3C),
-                        blurRadius: 12,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Pill(
-                            'Trung tâm điều hành Proptech',
-                            dense: true,
-                            color: Colors.white,
-                            bg: Colors.white.withValues(alpha: 0.16),
-                          ),
-                          const Pill(
-                            'Hệ thống ổn định 99.9%',
-                            dense: true,
-                            color: PT.deep,
-                            bg: Color(0xFFA7F3D0),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 6,
-                        alignment: WrapAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Doanh thu hệ thống',
-                                style: PT.body(
-                                  10,
-                                  Colors.white.withValues(alpha: 0.78),
-                                ),
-                              ),
-                              Text(
-                                '${(totalRevenue / 1000000).toStringAsFixed(2)}tr đ',
-                                style: PT
-                                    .title(17)
-                                    .copyWith(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Thành viên VIP',
-                                style: PT.body(
-                                  10,
-                                  Colors.white.withValues(alpha: 0.78),
-                                ),
-                              ),
-                              Text(
-                                '$vipCount tài khoản',
-                                style: PT
-                                    .title(14)
-                                    .copyWith(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tin đẩy nổi bật',
-                                style: PT.body(
-                                  10,
-                                  Colors.white.withValues(alpha: 0.78),
-                                ),
-                              ),
-                              Text(
-                                '$boostedRooms phòng',
-                                style: PT
-                                    .title(14)
-                                    .copyWith(color: const Color(0xFFFDE68A)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+        final systemFeedbacks = dashboard.systemFeedbacks;
+        final avgSystemRating = systemFeedbacks.isEmpty
+            ? '4.8'
+            : (systemFeedbacks.fold<int>(0, (s, f) => s + f.rating) /
+                      systemFeedbacks.length)
+                  .toStringAsFixed(1);
+        final avgLandlordRating =
+            (dashboard.landlordAverageRating > 0
+                    ? dashboard.landlordAverageRating
+                    : dashboard.averageRating)
+                .toStringAsFixed(1);
+
+        final activeRatingDistribution = reviewScope == 'LANDLORD'
+            ? dashboard.ratingDistribution
+            : [
+                for (final star in [5, 4, 3, 2, 1])
+                  () {
+                    final c = systemFeedbacks
+                        .where((f) => f.rating == star)
+                        .length;
+                    final pct = systemFeedbacks.isEmpty
+                        ? 0.0
+                        : (c * 100.0 / systemFeedbacks.length);
+                    return AdminRatingBreakdown(
+                      star: star,
+                      count: c,
+                      percentage: pct,
+                    );
+                  }(),
+              ];
+
+        final pendingRoomsCount = state.rooms
+            .where((r) => r.status == RoomStatus.pending)
+            .length;
+
+        return ListView(
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(18, 6, 18, 28),
+          children: [
+            Header(
+              admin: true,
+              unreadNotifications: state.unreadNotifications,
+              onMap: () => openPage(context, AdminUsersScreen(state: state)),
+              onNotifications: () =>
+                  openPage(context, NotificationsScreen(state: state)),
+            ),
+            const SizedBox(height: 4),
+            const PageHeading(
+              'Quản trị viên',
+              'Tổng quan hệ thống Phòng Trọ Xanh',
+            ),
+            const SizedBox(height: 6),
+
+            // Executive Command Banner + Refresh Action
+            Container(
+              padding: const EdgeInsets.all(18),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [PT.deep, Color(0xFF0A524A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                LayoutBuilder(
-                  builder: (context, c) => Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x22073B3C),
+                    blurRadius: 18,
+                    offset: Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      for (final stat in [
-                        (
-                          'Người dùng',
-                          state.store.profiles.length,
-                          '+12% tháng này',
-                          LucideIcons.users,
-                          PT.green,
-                          PT.mint,
-                        ),
-                        (
-                          'Phòng trọ',
-                          state.rooms.length,
-                          '${state.rooms.where((r) => r.status == RoomStatus.available).length} đang mở',
-                          LucideIcons.building2,
-                          const Color(0xFF0799DE),
-                          const Color(0xFFEEF8FF),
-                        ),
-                        (
-                          'Báo cáo chờ xử lý',
-                          state.store.reports
-                              .where((r) => r.status == 'Chờ xử lý')
-                              .length,
-                          'Ưu tiên kiểm duyệt',
-                          LucideIcons.flag,
-                          PT.error,
-                          const Color(0xFFFEF2F2),
-                        ),
-                        (
-                          'CCCD chờ duyệt',
-                          state.store.kyc
-                              .where((k) => k.status == 'Chờ duyệt')
-                              .length,
-                          'Hàng đợi eKYC',
-                          LucideIcons.idCard,
-                          PT.amber,
-                          const Color(0xFFFFF8ED),
-                        ),
-                      ])
-                        SizedBox(
-                          width: (c.maxWidth - 6) / 2,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 6,
-                            ),
-                            decoration: PT.card(radius: 12),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(5),
-                                  decoration: BoxDecoration(
-                                    color: stat.$6,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    stat.$4,
-                                    size: 14,
-                                    color: stat.$5,
-                                  ),
-                                ),
-                                const SizedBox(width: 7),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            '${stat.$2}',
-                                            style: PT
-                                                .title(16)
-                                                .copyWith(color: stat.$5),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              stat.$1,
-                                              style: PT.title(11),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      Text(
-                                        stat.$3,
-                                        style: PT.body(10, PT.muted),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: PT.grey,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Row(
-                    children: [
-                      for (var i = 0; i < 3; i++)
-                        Expanded(
-                          child: Material(
-                            color: analyticsTab == i
-                                ? Colors.white
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(9),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(9),
-                              onTap: () => setState(() => analyticsTab = i),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 6,
-                                ),
-                                child: Text(
-                                  const [
-                                    'Điều hành',
-                                    'Người thuê & Ghép đôi',
-                                    'Chủ trọ & Nguồn cung',
-                                  ][i],
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: PT
-                                      .body(
-                                        11,
-                                        analyticsTab == i ? PT.green : PT.muted,
-                                      )
-                                      .copyWith(
-                                        fontWeight: analyticsTab == i
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                      ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                if (analyticsTab == 0)
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final allItems = [
-                        MenuRow(
-                          spacious: false,
-                          framed: false,
-                          icon: LucideIcons.fileCheck,
-                          title: 'Duyệt CCCD',
-                          subtitle: 'Hồ sơ theo ID',
-                          onTap: () => openPage(
-                            context,
-                            AdminQueueScreen(state: state),
-                          ),
-                        ),
-                        MenuRow(
-                          spacious: false,
-                          framed: false,
-                          icon: LucideIcons.house,
-                          title: 'Duyệt tin phòng',
-                          subtitle:
-                              '${state.rooms.where((r) => r.status == RoomStatus.pending).length} tin chờ duyệt',
-                          onTap: () => openPage(
-                            context,
-                            AdminRoomsScreen(state: state),
-                          ),
-                        ),
-                        MenuRow(
-                          spacious: false,
-                          framed: false,
-                          icon: LucideIcons.flag,
-                          title: 'Báo cáo vi phạm',
-                          subtitle: 'Nội dung & xử lý',
-                          onTap: () => openPage(
-                            context,
-                            AdminReportsScreen(state: state),
-                          ),
-                        ),
-                        MenuRow(
-                          spacious: false,
-                          framed: false,
-                          icon: LucideIcons.users,
-                          title: 'Quản lý người dùng',
-                          subtitle: 'Khóa / mở khóa',
-                          onTap: () => openPage(
-                            context,
-                            AdminUsersScreen(state: state),
-                          ),
-                        ),
-                        MenuRow(
-                          spacious: false,
-                          framed: false,
-                          icon: LucideIcons.package,
-                          title: 'Quản lý gói dịch vụ',
-                          subtitle: '${state.store.plans.length} gói VIP',
-                          onTap: () => openPage(
-                            context,
-                            AdminPackagesScreen(state: state),
-                          ),
-                        ),
-                        MenuRow(
-                          spacious: false,
-                          framed: false,
-                          icon: LucideIcons.scale,
-                          title: 'Khiếu nại & Nhật ký hệ thống',
-                          subtitle: 'Tranh chấp & log',
-                          onTap: () => openPage(
-                            context,
-                            AdminDisputesScreen(state: state),
-                          ),
-                        ),
-                      ];
-                      final twoCol =
-                          constraints.maxWidth >= 320 &&
-                          MediaQuery.textScalerOf(context).scale(12) <= 15;
-                      if (!twoCol) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 2,
-                          ),
-                          decoration: PT.card(),
-                          child: Column(children: allItems),
-                        );
-                      }
-                      final cellWidth = (constraints.maxWidth - 6) / 2;
-                      return Wrap(
-                        spacing: 6,
-                        runSpacing: 5,
-                        children: [
-                          for (var i = 0; i < allItems.length; i++)
-                            Container(
-                              width: cellWidth,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 1,
-                              ),
-                              decoration: PT.card(radius: 11),
-                              child: allItems[i],
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                if (analyticsTab == 1 || showExtraGrowth) ...[
-                  if (showExtraGrowth) const SizedBox(height: 6),
-                  RepaintBoundary(
-                    child: flowCard('Tăng trưởng hệ thống 6 tháng', [
                       Container(
-                        height: 62,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 4,
+                          horizontal: 10,
+                          vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: PT.grey.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(10),
+                          color: const Color(0xFFA7F3D0),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            for (final m in const [
-                              ('T5', 0.45, 0.35),
-                              ('T6', 0.55, 0.48),
-                              ('T7', 0.64, 0.52),
-                              ('T8', 0.76, 0.68),
-                              ('T9', 0.88, 0.78),
-                              ('T10', 1.0, 0.92),
-                            ])
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 3,
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      Expanded(
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Flexible(
-                                              child: FractionallySizedBox(
-                                                heightFactor: m.$2,
-                                                child: Container(
-                                                  width: 7,
-                                                  decoration: BoxDecoration(
-                                                    color: PT.green,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          3,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 2),
-                                            Flexible(
-                                              child: FractionallySizedBox(
-                                                heightFactor: m.$3,
-                                                child: Container(
-                                                  width: 7,
-                                                  decoration: BoxDecoration(
-                                                    color: PT.amber,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          3,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(m.$1, style: PT.body(10, PT.muted)),
-                                    ],
-                                  ),
-                                ),
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: PT.green,
+                                shape: BoxShape.circle,
                               ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Hệ thống ổn định 99.9%',
+                              style: PT.body(11, PT.deep).copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'TrustScore TB: 88/100 • Ghép đôi: 87% • eKYC: 92%',
-                        style: PT
-                            .body(11, PT.green)
-                            .copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ]),
-                  ),
-                ],
-                if (analyticsTab == 2) ...[
-                  flowCard(
-                    'Nguồn cung & Đánh giá ($avgSatisfaction/5)',
-                    [
-                      Text(
-                        'Tỷ lệ lấp đầy toàn hệ thống: 84% (Q.10 42% • Thủ Đức 35%)',
-                        style: PT.body(11, PT.green).copyWith(
-                          fontWeight: FontWeight.w600,
+                      InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: _refreshDashboard,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.22),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                LucideIcons.refreshCw,
+                                size: 13,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _loadingDashboard ? 'Đang tải...' : 'Làm mới',
+                                style: PT.body(11.5, Colors.white).copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      for (final fb in feedbacks.take(2))
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Doanh thu hệ thống',
+                    style: PT.body(
+                      12,
+                      Colors.white.withValues(alpha: 0.78),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatVnd(dashboard.totalRevenue),
+                    style: _tabular(
+                      PT.title(26).copyWith(color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: Wrap(
+                      spacing: 20,
+                      runSpacing: 10,
+                      alignment: WrapAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Giao dịch & gói VIP',
+                              style: PT.body(
+                                11,
+                                Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${dashboard.totalTransactions} GD • $vipCount VIP',
+                              style: _tabular(
+                                PT.title(14).copyWith(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tin đẩy nổi bật',
+                              style: PT.body(
+                                11,
+                                Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${dashboard.activeBoostedRooms} phòng đang đẩy',
+                              style: _tabular(
+                                PT.title(14).copyWith(
+                                  color: const Color(0xFFFDE68A),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ROW 1: 4 CORE KPI CARDS (Matching AdminOverview.tsx)
+            LayoutBuilder(
+              builder: (context, c) {
+                final textScale = MediaQuery.textScalerOf(context).scale(1);
+                final twoCol = c.maxWidth >= 320 && textScale <= 1.35;
+                final cardWidth = twoCol ? (c.maxWidth - 12) / 2 : c.maxWidth;
+                final kpiCards = [
+                  (
+                    title: 'Người dùng hệ thống',
+                    value: '${dashboard.totalUsers}',
+                    badge: '${dashboard.verifiedUsersCount} đã KYC',
+                    subLeft: '${dashboard.totalTenants} người thuê',
+                    subRight: '${dashboard.totalLandlords} chủ trọ',
+                    icon: LucideIcons.users,
+                    color: PT.green,
+                    bg: PT.mint,
+                    onTap: () =>
+                        openPage(context, AdminUsersScreen(state: state)),
+                  ),
+                  (
+                    title: 'Nguồn cung phòng trọ',
+                    value: '${dashboard.totalRooms}',
+                    badge: 'Lấp đầy $occupancyRate%',
+                    subLeft: '${dashboard.activeRooms} phòng trống',
+                    subRight: '${dashboard.totalRentals} hợp đồng',
+                    icon: LucideIcons.building2,
+                    color: const Color(0xFF0799DE),
+                    bg: const Color(0xFFEEF8FF),
+                    onTap: () =>
+                        openPage(context, AdminRoomsScreen(state: state)),
+                  ),
+                  (
+                    title: 'Ghép đôi & Cá nhân hóa',
+                    value: '${dashboard.totalMatches}',
+                    badge: 'Lifestyle Match',
+                    subLeft: '${dashboard.totalSwipes} lượt quẹt',
+                    subRight: '${dashboard.totalSwapRequests} pass phòng',
+                    icon: LucideIcons.sparkles,
+                    color: const Color(0xFF7C3AED),
+                    bg: const Color(0xFFF5F3FF),
+                    onTap: () => setState(() => analyticsTab = 1),
+                  ),
+                  (
+                    title: 'Hàng đợi Kiểm duyệt',
+                    value: '$pendingTotalActions',
+                    badge: pendingTotalActions > 0 ? 'Cần xử lý' : 'An toàn',
+                    subLeft: '${dashboard.pendingKycCount} CCCD',
+                    subRight:
+                        '${dashboard.pendingDisputesCount} KN • ${dashboard.pendingReportsCount} BC',
+                    icon: LucideIcons.shieldAlert,
+                    color: pendingTotalActions > 0 ? PT.amber : PT.green,
+                    bg: pendingTotalActions > 0
+                        ? const Color(0xFFFFF8ED)
+                        : PT.mint,
+                    onTap: () =>
+                        openPage(context, AdminQueueScreen(state: state)),
+                  ),
+                ];
+
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final kpi in kpiCards)
+                      SizedBox(
+                        width: cardWidth,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: kpi.onTap,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
+                            padding: const EdgeInsets.all(15),
                             decoration: BoxDecoration(
-                              color: PT.mint.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: PT.line.withValues(alpha: 0.85),
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x0A073B3C),
+                                  blurRadius: 14,
+                                  offset: Offset(0, 5),
+                                ),
+                              ],
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    '${fb.authorName}: ${fb.comment}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: PT.body(11),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 34,
+                                      height: 34,
+                                      decoration: BoxDecoration(
+                                        color: kpi.bg,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        kpi.icon,
+                                        size: 17,
+                                        color: kpi.color,
+                                      ),
+                                    ),
+                                    Pill(
+                                      kpi.badge,
+                                      dense: true,
+                                      color: kpi.color,
+                                      bg: kpi.bg,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  kpi.value,
+                                  style: _tabular(
+                                    PT.title(22).copyWith(color: kpi.color),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                InkWell(
-                                  onTap: () => state.workflows
-                                      .deleteSystemFeedback(fb.id),
-                                  child: Text(
-                                    'Xóa phản hồi',
-                                    style: PT.body(10, PT.error).copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  kpi.title,
+                                  style: PT.title(13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${kpi.subLeft} • ${kpi.subRight}',
+                                  style: PT.body(11.5, PT.muted),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
                           ),
                         ),
-                    ],
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // QUICK OPERATIONS GROUPED CARD (Full-width rows -> zero truncation, zero box soup)
+            _adminSectionCard(
+              'Tác vụ kiểm duyệt & vận hành',
+              [
+                for (final (idx, action) in [
+                  (
+                    icon: LucideIcons.fileCheck,
+                    title: 'Duyệt CCCD',
+                    subtitle: 'Xác thực hồ sơ định danh eKYC',
+                    badge: '${dashboard.pendingKycCount} chờ duyệt',
+                    color: PT.green,
+                    bg: PT.mint,
+                    onTap: () =>
+                        openPage(context, AdminQueueScreen(state: state)),
                   ),
-                ],
+                  (
+                    icon: LucideIcons.house,
+                    title: 'Duyệt tin phòng',
+                    subtitle: 'Kiểm duyệt tin đăng và hình ảnh thực tế',
+                    badge: '$pendingRoomsCount chờ duyệt',
+                    color: const Color(0xFF0799DE),
+                    bg: const Color(0xFFEEF8FF),
+                    onTap: () =>
+                        openPage(context, AdminRoomsScreen(state: state)),
+                  ),
+                  (
+                    icon: LucideIcons.flag,
+                    title: 'Báo cáo vi phạm',
+                    subtitle: 'Xử lý nội dung xấu và tài khoản vi phạm',
+                    badge: '${dashboard.pendingReportsCount} báo cáo',
+                    color: PT.amber,
+                    bg: const Color(0xFFFFF8ED),
+                    onTap: () =>
+                        openPage(context, AdminReportsScreen(state: state)),
+                  ),
+                  (
+                    icon: LucideIcons.users,
+                    title: 'Quản lý người dùng',
+                    subtitle: 'Phân quyền, khóa hoặc khôi phục tài khoản',
+                    badge: '${dashboard.totalUsers} tài khoản',
+                    color: PT.green,
+                    bg: PT.mint,
+                    onTap: () =>
+                        openPage(context, AdminUsersScreen(state: state)),
+                  ),
+                  (
+                    icon: LucideIcons.package,
+                    title: 'Quản lý gói dịch vụ',
+                    subtitle: 'Cấu hình bảng giá và quyền lợi gói VIP',
+                    badge: '${state.store.plans.length} gói VIP',
+                    color: const Color(0xFF7C3AED),
+                    bg: const Color(0xFFF5F3FF),
+                    onTap: () =>
+                        openPage(context, AdminPackagesScreen(state: state)),
+                  ),
+                  (
+                    icon: LucideIcons.scale,
+                    title: 'Khiếu nại & Nhật ký hệ thống',
+                    subtitle: 'Giải quyết tranh chấp đánh giá và audit log',
+                    badge: '${dashboard.pendingDisputesCount} khiếu nại',
+                    color: PT.deep,
+                    bg: PT.grey,
+                    onTap: () =>
+                        openPage(context, AdminDisputesScreen(state: state)),
+                  ),
+                ].indexed) ...[
+                  if (idx > 0)
+                    Divider(
+                      height: 18,
+                      thickness: 1,
+                      color: PT.line.withValues(alpha: 0.65),
+                    ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: action.onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: action.bg,
+                              borderRadius: BorderRadius.circular(11),
+                            ),
+                            child: Icon(
+                              action.icon,
+                              size: 18,
+                              color: action.color,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  action.title,
+                                  style: PT.title(13.5),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  action.subtitle,
+                                  style: PT.body(11.5, PT.muted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Pill(
+                            action.badge,
+                            dense: true,
+                            color: action.color,
+                            bg: action.bg,
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            LucideIcons.chevronRight,
+                            size: 16,
+                            color: PT.muted,
+                          ),
                         ],
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: PrimaryButton(
-                          'Đăng xuất',
-                          outline: true,
-                          onTap: () => AppScope.maybeOf(context)?.logout(),
+                    ),
+                  ),
+                ],
+              ],
+              subtitle: 'Truy cập nhanh các phân hệ quản trị trọng yếu',
+            ),
+
+            // ROW 2: 3 PRIORITY BENTO CARDS (Traffic, Transactions & Packages, Reviews & System Feedback)
+            // Bento 1: Nguồn truy cập (Traffic Sources)
+            _adminSectionCard(
+              'Nguồn truy cập (Traffic Sources)',
+              [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5FAF8),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: PT.line.withValues(alpha: 0.7)),
+                  ),
+                  child: Wrap(
+                    spacing: 16,
+                    runSpacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 74,
+                        height: 74,
+                        child: CustomPaint(
+                          painter: const _TrafficDonutPainter(),
+                          child: Center(
+                            child: Text(
+                              '100%',
+                              style: _tabular(
+                                PT.title(12).copyWith(color: PT.deep),
+                              ),
+                            ),
+                          ),
                         ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${math.max(120, dashboard.totalUsers * 18)} phiên truy cập',
+                            style: _tabular(
+                              PT.title(15).copyWith(color: PT.green),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Phân bổ lưu lượng đa kênh 30 ngày qua',
+                            style: PT.body(12, PT.muted),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+                for (final src in const [
+                  ('Truy cập trực tiếp (Direct)', 42, PT.green),
+                  ('Tìm kiếm tự nhiên (Organic)', 31, Color(0xFF0799DE)),
+                  ('Mạng xã hội (Social)', 18, Color(0xFF7C3AED)),
+                  ('Giới thiệu (Referral)', 9, PT.amber),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                src.$1,
+                                style: PT.body(12.5, PT.deep).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${src.$2}%',
+                              style: _tabular(
+                                PT.body(12.5, src.$3).copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: src.$2 / 100.0,
+                            minHeight: 7,
+                            backgroundColor: PT.grey,
+                            color: src.$3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
-            );
-          },
+            ),
+
+            // Bento 2: Giao dịch Thanh toán & Doanh thu theo Gói dịch vụ
+            _adminSectionCard(
+              'Giao dịch & Doanh thu Gói dịch vụ',
+              [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Pill(
+                      'Tổng: ${_formatVnd(dashboard.totalRevenue)} (${dashboard.totalTransactions} GD)',
+                      dense: true,
+                      color: PT.green,
+                      bg: PT.mint,
+                    ),
+                    Pill(
+                      'HĐ hiệu lực: ${dashboard.activeRentals}/${dashboard.totalRentals}',
+                      dense: true,
+                      color: const Color(0xFF0799DE),
+                      bg: const Color(0xFFEEF8FF),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                for (final pkg in dashboard.packageStats)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${pkg.planName} (${pkg.count} lượt)',
+                                style: PT.body(12.5, PT.deep).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _formatVnd(pkg.revenue),
+                              style: _tabular(
+                                PT.body(12.5, PT.green).copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: dashboard.totalRevenue <= 0
+                                ? 0.0
+                                : (pkg.revenue / dashboard.totalRevenue).clamp(
+                                    0.05,
+                                    1.0,
+                                  ),
+                            minHeight: 7,
+                            backgroundColor: PT.grey,
+                            color: PT.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              trailing: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () =>
+                    openPage(context, AdminDisputesScreen(state: state)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
+                  child: Text(
+                    'Xem lịch sử →',
+                    style: PT.body(12, PT.green).copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Bento 3: Đánh giá & Mức độ hài lòng (Chủ trọ vs Hệ thống)
+            _adminSectionCard(
+              'Đánh giá & Mức độ hài lòng',
+              [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ChoiceChip(
+                      label: Text('Chủ trọ (${dashboard.recentReviews.length})'),
+                      selected: reviewScope == 'LANDLORD',
+                      onSelected: (_) => setState(() {
+                        reviewScope = 'LANDLORD';
+                        selectedStarFilter = null;
+                      }),
+                    ),
+                    ChoiceChip(
+                      label: Text('Hệ thống (${systemFeedbacks.length})'),
+                      selected: reviewScope == 'SYSTEM',
+                      onSelected: (_) => setState(() {
+                        reviewScope = 'SYSTEM';
+                        selectedStarFilter = null;
+                      }),
+                    ),
+                    Pill(
+                      reviewScope == 'LANDLORD'
+                          ? '$avgLandlordRating / 5 ★'
+                          : '$avgSystemRating / 5 ★',
+                      dense: true,
+                      color: PT.amber,
+                      bg: const Color(0xFFFFF8ED),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                for (final item in activeRatingDistribution)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => setState(
+                        () => selectedStarFilter =
+                            selectedStarFilter == item.star ? null : item.star,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 40,
+                              child: Text(
+                                '${item.star} ★',
+                                style: _tabular(
+                                  PT
+                                      .body(
+                                        12,
+                                        selectedStarFilter == item.star
+                                            ? PT.amber
+                                            : PT.deep,
+                                      )
+                                      .copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  value: (item.percentage / 100.0).clamp(
+                                    0.0,
+                                    1.0,
+                                  ),
+                                  minHeight: 7,
+                                  backgroundColor: PT.grey,
+                                  color: selectedStarFilter == item.star
+                                      ? PT.green
+                                      : PT.amber,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            SizedBox(
+                              width: 30,
+                              child: Text(
+                                '${item.count}',
+                                textAlign: TextAlign.right,
+                                style: _tabular(PT.body(12, PT.muted)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 10),
+                if (reviewScope == 'LANDLORD')
+                  for (final rev
+                      in dashboard.recentReviews
+                          .where(
+                            (r) =>
+                                selectedStarFilter == null ||
+                                r.rating == selectedStarFilter,
+                          )
+                          .take(2))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _showReviewDetailDialog(
+                          context,
+                          state,
+                          landlordReview: rev,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF6F9F8),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: PT.line.withValues(alpha: 0.7),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    rev.reviewerName,
+                                    style: PT.body(12.5, PT.deep).copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${rev.rating}★',
+                                    style: PT.body(11.5, PT.amber).copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  if (rev.isVerifiedStay)
+                                    Text(
+                                      '• Đã thuê thực tế',
+                                      style: PT.body(11, PT.green).copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                rev.comment,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: PT.body(12, PT.deep),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                if (reviewScope == 'SYSTEM')
+                  for (final fb
+                      in systemFeedbacks
+                          .where(
+                            (f) =>
+                                selectedStarFilter == null ||
+                                f.rating == selectedStarFilter,
+                          )
+                          .take(2))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _showReviewDetailDialog(
+                          context,
+                          state,
+                          systemFeedback: fb,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: PT.mint.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: PT.green.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    '${fb.userName} • ${fb.rating}★',
+                                    style: PT.body(12.5, PT.deep).copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () => state.workflows
+                                        .deleteSystemFeedback(fb.id),
+                                    child: Text(
+                                      'Xóa phản hồi',
+                                      style: PT.body(11.5, PT.error).copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                fb.comment,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: PT.body(12, PT.deep),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () =>
+                        _showAllReviewsModal(context, state, dashboard),
+                    icon: const Icon(LucideIcons.listFilter, size: 15),
+                    label: const Text('Xem & Lọc tất cả'),
+                  ),
+                ),
+              ],
+            ),
+
+            // ROW 3: 3 DEEP-DIVE ANALYTICS TABS (Matching AdminOverview.tsx)
+            Container(
+              padding: const EdgeInsets.all(4),
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: PT.grey,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: PT.line.withValues(alpha: 0.8)),
+              ),
+              child: Row(
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Expanded(
+                      child: Material(
+                        color: analyticsTab == i
+                            ? Colors.white
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(11),
+                        elevation: analyticsTab == i ? 1 : 0,
+                        shadowColor: const Color(0x14073B3C),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(11),
+                          onTap: () => setState(() => analyticsTab = i),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                              horizontal: 6,
+                            ),
+                            child: Text(
+                              const [
+                                'Tăng trưởng & Chuyển đổi',
+                                'Cá nhân hóa & Uy tín',
+                                'Cung - Cầu & Phòng trọ',
+                              ][i],
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: PT
+                                  .body(
+                                    11.5,
+                                    analyticsTab == i ? PT.green : PT.muted,
+                                  )
+                                  .copyWith(
+                                    fontWeight: analyticsTab == i
+                                        ? FontWeight.w700
+                                        : FontWeight.w600,
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // TAB 0: TĂNG TRƯỞNG & PHỄU CHUYỂN ĐỔI
+            if (analyticsTab == 0) ...[
+              RepaintBoundary(
+                child: _adminSectionCard(
+                  'Biểu đồ Tăng trưởng Hệ thống (6 tháng)',
+                  [
+                    Builder(
+                      builder: (context) {
+                        final stats = dashboard.monthlyStats;
+                        final maxUsers = stats.isEmpty
+                            ? 1
+                            : stats
+                                  .map((s) => s.newUsers)
+                                  .reduce(math.max)
+                                  .clamp(1, 999999);
+                        final maxRentals = stats.isEmpty
+                            ? 1
+                            : stats
+                                  .map((s) => s.newRentals)
+                                  .reduce(math.max)
+                                  .clamp(1, 999999);
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF6FAF8),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: PT.line.withValues(alpha: 0.7),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              for (final m in stats)
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 3,
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          height: 64,
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Flexible(
+                                                child: FractionallySizedBox(
+                                                  heightFactor:
+                                                      (m.newUsers / maxUsers)
+                                                          .clamp(0.15, 1.0),
+                                                  child: Container(
+                                                    width: 8,
+                                                    decoration: BoxDecoration(
+                                                      color: PT.green,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 3),
+                                              Flexible(
+                                                child: FractionallySizedBox(
+                                                  heightFactor:
+                                                      (m.newRentals /
+                                                              maxRentals)
+                                                          .clamp(0.15, 1.0),
+                                                  child: Container(
+                                                    width: 8,
+                                                    decoration: BoxDecoration(
+                                                      color: PT.amber,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          m.month.length >= 2
+                                              ? m.month.substring(0, 2)
+                                              : m.month,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: _tabular(
+                                            PT.body(11, PT.muted),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 6,
+                      children: [
+                        Text(
+                          '● Người dùng mới',
+                          style: PT.body(11.5, PT.green).copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '● Hợp đồng thuê',
+                          style: PT.body(11.5, PT.amber).copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              _adminSectionCard(
+                'Phễu Chuyển đổi Thuê trọ & Ghép bạn',
+                [
+                  for (var i = 0; i < dashboard.personalizationFunnel.length; i++)
+                    Builder(
+                      builder: (context) {
+                        final step = dashboard.personalizationFunnel[i];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${i + 1}. ${step.name}',
+                                      style: PT.body(12.5, PT.deep).copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${step.count} (${step.percentage.toStringAsFixed(0)}%)',
+                                    style: _tabular(
+                                      PT.body(12.5, PT.green).copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  value: (step.percentage / 100.0).clamp(
+                                    0.05,
+                                    1.0,
+                                  ),
+                                  minHeight: 7,
+                                  backgroundColor: PT.grey,
+                                  color: PT.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Pill(
+                        'Lượt quẹt: ${dashboard.totalSwipes}',
+                        dense: true,
+                        color: const Color(0xFF7C3AED),
+                      ),
+                      Pill(
+                        'Ghép đôi: ${dashboard.totalMatches}',
+                        dense: true,
+                        color: PT.green,
+                      ),
+                      Pill(
+                        'Pass phòng: ${dashboard.totalSwapRequests}',
+                        dense: true,
+                        color: PT.amber,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+
+            // TAB 1: CÁ NHÂN HÓA & UY TÍN (Radar 4 tiêu chí lối sống + TrustScore + eKYC)
+            if (analyticsTab == 1) ...[
+              _adminSectionCard(
+                'Xu hướng 4 Tiêu chí Lối sống (Lifestyle Match)',
+                [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F6FF),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFF7C3AED).withValues(alpha: 0.16),
+                      ),
+                    ),
+                    child: Wrap(
+                      spacing: 16,
+                      runSpacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 76,
+                          height: 76,
+                          child: CustomPaint(
+                            painter: _LifestyleRadarPainter(
+                              values: dashboard.lifestyleStats
+                                  .take(4)
+                                  .map(
+                                    (s) =>
+                                        (s.percentage / 100.0).clamp(0.1, 1.0),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${dashboard.totalMatches} cặp ghép đôi tương thích',
+                              style: _tabular(
+                                PT.title(15).copyWith(
+                                  color: const Color(0xFF7C3AED),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Tỷ lệ ưu tiên theo khảo sát lối sống người thuê',
+                              style: PT.body(12, PT.muted),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  for (final item in dashboard.lifestyleStats)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            alignment: WrapAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                item.name,
+                                style: PT.body(12.5, PT.deep).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${item.count} (${item.percentage.toStringAsFixed(0)}%)',
+                                style: _tabular(
+                                  PT
+                                      .body(12.5, const Color(0xFF7C3AED))
+                                      .copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              value: (item.percentage / 100.0).clamp(0.05, 1.0),
+                              minHeight: 7,
+                              backgroundColor: PT.grey,
+                              color: const Color(0xFF7C3AED),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              _adminSectionCard(
+                'Phân bố Điểm uy tín (TrustScore) & Kiểm duyệt CCCD',
+                [
+                  for (final ts in dashboard.trustScoreDistribution)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            alignment: WrapAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                ts.range,
+                                style: PT.body(12.5, PT.deep).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${ts.count} (${ts.percentage.toStringAsFixed(1)}%)',
+                                style: _tabular(
+                                  PT.body(12.5, PT.green).copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              value: (ts.percentage / 100.0).clamp(0.04, 1.0),
+                              minHeight: 7,
+                              backgroundColor: PT.grey,
+                              color: PT.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Pill(
+                        'Tỷ lệ duyệt KYC: ${dashboard.kycOverview.approvalRate.toStringAsFixed(1)}%',
+                        dense: true,
+                        color: PT.green,
+                      ),
+                      Pill(
+                        'Đã duyệt: ${dashboard.kycOverview.approvedCount}',
+                        dense: true,
+                        color: PT.green,
+                      ),
+                      Pill(
+                        'Chờ duyệt: ${dashboard.kycOverview.pendingCount}',
+                        dense: true,
+                        color: PT.amber,
+                      ),
+                      Pill(
+                        'Từ chối: ${dashboard.kycOverview.rejectedCount}',
+                        dense: true,
+                        color: PT.error,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+
+            // TAB 2: CUNG - CẦU KHU VỰC & PHÂN BỔ PHÒNG TRỌ
+            if (analyticsTab == 2) ...[
+              _adminSectionCard(
+                'Tương quan Cung - Cầu theo Khu vực',
+                [
+                  for (final d in dashboard.districtSupplyDemand)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                d.district,
+                                style: PT.body(12.5, PT.deep).copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                'Cung: ${d.supply} • Cầu: ${d.demand}',
+                                style: _tabular(PT.body(11.5, PT.muted)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: math.max(1, d.supply),
+                                child: Container(
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: PT.green,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                flex: math.max(1, d.demand),
+                                child: Container(
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0799DE),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 14,
+                    runSpacing: 6,
+                    children: [
+                      Text(
+                        '● Nguồn cung (Phòng trống)',
+                        style: PT.body(11.5, PT.green).copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '● Nhu cầu (Tìm kiếm)',
+                        style: PT.body(11.5, const Color(0xFF0799DE)).copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              _adminSectionCard(
+                'Loại hình & Trạng thái Phòng trọ ($avgSystemRating/5)',
+                [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final rt in dashboard.roomTypeDistribution)
+                        Pill(
+                          '${rt.name}: ${rt.count} (${rt.percentage.toStringAsFixed(0)}%)',
+                          dense: true,
+                          color: PT.green,
+                          bg: PT.mint,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final rs in dashboard.roomStatusDistribution)
+                        Pill(
+                          '${rs.name}: ${rs.count}',
+                          dense: true,
+                          color: const Color(0xFF0799DE),
+                          bg: const Color(0xFFEEF8FF),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: PrimaryButton(
+                'Đăng xuất',
+                outline: true,
+                onTap: () => AppScope.maybeOf(context)?.logout(),
+              ),
+            ),
+          ],
         );
       },
     );
   }
+}
+
+class _TrafficDonutPainter extends CustomPainter {
+  const _TrafficDonutPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 5;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    const segments = [
+      (0.42, PT.green),
+      (0.31, Color(0xFF0799DE)),
+      (0.18, Color(0xFF7C3AED)),
+      (0.09, PT.amber),
+    ];
+    var startAngle = -math.pi / 2;
+    for (final seg in segments) {
+      final sweep = seg.$1 * 2 * math.pi;
+      final paint = Paint()
+        ..color = seg.$2
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..strokeCap = StrokeCap.butt;
+      canvas.drawArc(rect, startAngle, sweep - 0.05, false, paint);
+      startAngle += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _LifestyleRadarPainter extends CustomPainter {
+  final List<double> values;
+  const _LifestyleRadarPainter({required this.values});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxR = math.min(size.width, size.height) / 2 - 6;
+    final gridPaint = Paint()
+      ..color = PT.line
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    for (final factor in [0.35, 0.7, 1.0]) {
+      canvas.drawCircle(center, maxR * factor, gridPaint);
+    }
+    for (var i = 0; i < 4; i++) {
+      final angle = -math.pi / 2 + i * (math.pi / 2);
+      final p = Offset(
+        center.dx + maxR * math.cos(angle),
+        center.dy + maxR * math.sin(angle),
+      );
+      canvas.drawLine(center, p, gridPaint);
+    }
+
+    final pts = <Offset>[];
+    for (var i = 0; i < 4; i++) {
+      final v = i < values.length ? values[i] : 0.7;
+      final angle = -math.pi / 2 + i * (math.pi / 2);
+      pts.add(
+        Offset(
+          center.dx + maxR * v * math.cos(angle),
+          center.dy + maxR * v * math.sin(angle),
+        ),
+      );
+    }
+    final poly = Path()..addPolygon(pts, true);
+    canvas.drawPath(
+      poly,
+      Paint()
+        ..color = const Color(0xFF7C3AED).withValues(alpha: 0.24)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(
+      poly,
+      Paint()
+        ..color = const Color(0xFF7C3AED)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _LifestyleRadarPainter oldDelegate) =>
+      oldDelegate.values != values;
 }
 
 class AdminQueueScreen extends StatefulWidget {
