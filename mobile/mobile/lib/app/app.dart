@@ -161,6 +161,8 @@ class _PhongTroXanhAppState extends State<PhongTroXanhApp> {
         '/admin/cccd' => AdminQueueScreen(state: state),
         '/admin/users' => AdminUsersScreen(),
         '/admin/reports' => AdminReportsScreen(),
+        '/admin/packages' => AdminPackagesScreen(state: state),
+        '/admin/disputes' => AdminDisputesScreen(state: state),
         _ => null,
       };
     }
@@ -216,7 +218,7 @@ class _PhongTroXanhAppState extends State<PhongTroXanhApp> {
         'roommate' => 1,
         'messages' => 3,
         'profile' => 4,
-        'admin' => 4,
+        'admin' => state.role == UserRole.admin ? 0 : 4,
         _ => 0,
       },
     );
@@ -236,32 +238,97 @@ class _PhongTroXanhAppState extends State<PhongTroXanhApp> {
     ),
     debugShowCheckedModeBanner: false,
     theme: PT.theme,
-    builder: (context, child) => ColoredBox(
-      color: const Color(0xFFF2F6F4),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 430),
-          child: LayoutBuilder(
-            builder: (context, c) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(size: Size(math.min(c.maxWidth, 430), c.maxHeight)),
-              child: AppScope(
-                state: state,
-                requestLogin: requestLogin,
-                logout: logout,
-                child: child!,
+    builder: (context, child) => LayoutBuilder(
+      builder: (context, outer) {
+        final isDesktopFrame = outer.maxWidth > 520 && outer.maxHeight > 560;
+        if (!isDesktopFrame) {
+          return ColoredBox(
+            color: const Color(0xFFF2F6F4),
+            child: SizedBox(
+              width: outer.maxWidth,
+              height: outer.maxHeight,
+              child: MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(size: Size(outer.maxWidth, outer.maxHeight)),
+                child: AppScope(
+                  state: state,
+                  requestLogin: requestLogin,
+                  logout: logout,
+                  child: child!,
+                ),
+              ),
+            ),
+          );
+        }
+        final phoneWidth = math.min(outer.maxWidth - 32, 412.0);
+        final phoneHeight = (outer.maxHeight - 20).clamp(560.0, 900.0);
+        return ColoredBox(
+          color: const Color(0xFFDCE7E1),
+          child: Center(
+            child: Container(
+              width: phoneWidth + 12,
+              height: phoneHeight + 12,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16241E),
+                borderRadius: BorderRadius.circular(36),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33071A12),
+                    blurRadius: 32,
+                    offset: Offset(0, 14),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    size: Size(phoneWidth, phoneHeight),
+                    padding: const EdgeInsets.only(top: 6),
+                    viewPadding: const EdgeInsets.only(top: 6),
+                  ),
+                  child: AppScope(
+                    state: state,
+                    requestLogin: requestLogin,
+                    logout: logout,
+                    child: child!,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     ),
     onGenerateInitialRoutes: (initialRoute) => [
       MaterialPageRoute<void>(
-        builder: (_) => ListenableBuilder(
+        builder: (context) => ListenableBuilder(
           listenable: Listenable.merge([state, mode]),
-          builder: (_, _) => home(),
+          builder: (context, _) {
+            final reduced = MediaQuery.disableAnimationsOf(context);
+            return AnimatedSwitcher(
+              duration: reduced
+                  ? Duration.zero
+                  : const Duration(milliseconds: 240),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.985, end: 1.0).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                  child: child,
+                ),
+              ),
+              child: KeyedSubtree(key: ValueKey(mode.value), child: home()),
+            );
+          },
         ),
       ),
       if (initialPath(initialRoute) != '/')
@@ -326,19 +393,16 @@ class _AppShellState extends State<AppShell> {
         admin = state.role == UserRole.admin;
     final navLabelLines =
         landlord ||
+            admin ||
             MediaQuery.sizeOf(context).width < 360 ||
             MediaQuery.textScalerOf(context).scale(12) > 14
         ? 2
         : 1;
     final labels = landlord
         ? ['Tổng quan', 'Quản lý phòng', 'Tin nhắn', 'Đánh giá', 'Cá nhân']
-        : [
-            'Khám phá',
-            'Bạn ở',
-            'Nhận phòng',
-            'Tin nhắn',
-            admin ? 'Quản trị' : 'Cá nhân',
-          ];
+        : admin
+        ? ['Tổng quan', 'Duyệt CCCD', 'Duyệt phòng', 'Báo cáo', 'Người dùng']
+        : ['Khám phá', 'Bạn ở', 'Nhận phòng', 'Tin nhắn', 'Cá nhân'];
     final icons = landlord
         ? [
             LucideIcons.house,
@@ -346,6 +410,14 @@ class _AppShellState extends State<AppShell> {
             LucideIcons.messageCircle,
             LucideIcons.star,
             LucideIcons.user,
+          ]
+        : admin
+        ? [
+            LucideIcons.layoutDashboard,
+            LucideIcons.fileCheck,
+            LucideIcons.house,
+            LucideIcons.flag,
+            LucideIcons.users,
           ]
         : [
             LucideIcons.search,
@@ -362,6 +434,34 @@ class _AppShellState extends State<AppShell> {
             LandlordReviewsScreen(state: state),
             ProfileScreen(state: state, onLogout: widget.onLogout),
           ]
+        : admin
+        ? <Widget>[
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminScreen(state: state),
+            ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminQueueScreen(state: state),
+            ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminRoomsScreen(state: state),
+            ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminReportsScreen(state: state),
+            ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(role: UserRole.admin),
+              child: AdminUsersScreen(state: state),
+            ),
+          ]
         : <Widget>[
             RoomFeedView(state: state),
             DiscoverScreen(state: state, person: true),
@@ -375,20 +475,14 @@ class _AppShellState extends State<AppShell> {
               policy: const RoutePolicy(),
               child: MessagesScreen(state: state),
             ),
-            admin
-                ? AccessGuard(
-                    state: state,
-                    policy: const RoutePolicy(role: UserRole.admin),
-                    child: AdminScreen(state: state),
-                  )
-                : AccessGuard(
-                    state: state,
-                    policy: const RoutePolicy(),
-                    child: ProfileScreen(
-                      state: state,
-                      onLogout: widget.onLogout,
-                    ),
-                  ),
+            AccessGuard(
+              state: state,
+              policy: const RoutePolicy(),
+              child: ProfileScreen(
+                state: state,
+                onLogout: widget.onLogout,
+              ),
+            ),
           ];
     return Scaffold(
       body: SafeArea(
@@ -404,7 +498,7 @@ class _AppShellState extends State<AppShell> {
         labels: labels,
         icons: icons,
         labelLines: navLabelLines,
-        unreadIndex: state.conversations.any((c) => c.unread > 0)
+        unreadIndex: !admin && state.conversations.any((c) => c.unread > 0)
             ? (landlord ? 2 : 3)
             : null,
         onSelected: selectTab,

@@ -5,6 +5,7 @@ import '../domain/models.dart';
 
 class SessionUser {
   final String id, email, name, phone;
+  final String? avatarUrl;
   final UserRole role;
   const SessionUser({
     required this.id,
@@ -12,7 +13,24 @@ class SessionUser {
     required this.name,
     required this.role,
     this.phone = '',
+    this.avatarUrl,
   });
+
+  SessionUser copyWith({
+    String? id,
+    String? email,
+    String? name,
+    String? phone,
+    String? avatarUrl,
+    UserRole? role,
+  }) => SessionUser(
+    id: id ?? this.id,
+    email: email ?? this.email,
+    name: name ?? this.name,
+    phone: phone ?? this.phone,
+    role: role ?? this.role,
+    avatarUrl: avatarUrl ?? this.avatarUrl,
+  );
 }
 
 abstract interface class AuthRepository {
@@ -23,6 +41,7 @@ abstract interface class AuthRepository {
     required String name,
     required String phone,
   });
+  Future<SessionUser> loginWithGoogle(String idToken, {String role = 'TENANT'});
 }
 
 /// Preview-only capability, implemented by the mock adapter.
@@ -55,6 +74,8 @@ class SessionController extends ChangeNotifier {
       phone: phone,
     ),
   );
+  Future<bool> loginWithGoogle(String idToken, {String role = 'TENANT'}) =>
+      _request(() => repository.loginWithGoogle(idToken, role: role));
   Future<bool> _request(Future<SessionUser> Function() operation) async {
     if (_closed || busy) return false;
     final revision = ++_revision;

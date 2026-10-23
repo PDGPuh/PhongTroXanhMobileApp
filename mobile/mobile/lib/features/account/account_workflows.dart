@@ -25,12 +25,18 @@ class ProfileSetupScreen extends StatefulWidget {
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final form = GlobalKey<FormState>();
-  late final TextEditingController name, mail, bio, school, minimum, maximum;
-  late String gender, district, birthday;
+  late final TextEditingController name,
+      mail,
+      bio,
+      school,
+      minimum,
+      maximum,
+      ownerAddress;
+  late String gender, district, birthday, roomCountRange, primaryRoomType;
   late PhotoKind avatar;
   LocalPhoto? avatarPhoto;
-  late Set<String> interests;
-  late bool smoke, early, tidy;
+  late Set<String> interests, operatingDistricts;
+  late bool nonSmoking, early, tidy, allowGuests;
   int step = 0;
   String get draftKey =>
       widget.onComplete == null ? 'profile-form' : 'onboarding';
@@ -55,9 +61,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     school = TextEditingController(text: d['school'] ?? p.school);
     minimum = TextEditingController(text: '${d['min'] ?? p.budgetMin}');
     maximum = TextEditingController(text: '${d['max'] ?? p.budgetMax}');
+    ownerAddress = TextEditingController(text: d['ownerAddress'] ?? p.address);
     gender = d['gender'] ?? p.gender;
     district = d['district'] ?? p.district;
     birthday = d['birthday'] ?? p.birthday;
+    roomCountRange = d['roomCountRange'] ?? p.roomCountRange;
+    primaryRoomType = d['primaryRoomType'] ?? p.primaryRoomType;
     avatar = PhotoKind.values.firstWhere(
       (a) => a.name == d['avatar'],
       orElse: () => p.avatar,
@@ -66,13 +75,50 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ? s.ownPhoto(d['avatarPhoto'])
         : p.avatarPhoto;
     interests = {...(d['interests'] as List?)?.cast<String>() ?? s.interests};
-    smoke = d['smoke'] ?? s.smoking;
+    operatingDistricts = {
+      ...(d['operatingDistricts'] as List?)?.cast<String>() ??
+          p.operatingDistricts,
+    };
+    final smokeVal = d['smoke'] as bool?;
+    nonSmoking = d['nonSmoking'] ?? (smokeVal != null ? !smokeVal : s.nonSmoking);
     early = d['early'] ?? s.earlySleep;
     tidy = d['tidy'] ?? s.tidy;
+    allowGuests = d['allowGuests'] ?? s.allowGuests;
     step = (d['step'] as int? ?? 0).clamp(0, steps.length - 1);
-    for (final c in [name, mail, bio, school, minimum, maximum]) {
+    for (final c in [
+      name,
+      mail,
+      bio,
+      school,
+      minimum,
+      maximum,
+      ownerAddress,
+    ]) {
       c.addListener(saveDraft);
     }
+    _fetchFreshProfile();
+  }
+
+  Future<void> _fetchFreshProfile() async {
+    try {
+      await widget.state.loadUserProfile();
+      if (mounted) {
+        final s = widget.state;
+        final p = s.store.profiles[s.userId]!;
+        setState(() {
+          if (name.text.isEmpty || name.text == 'Khách') name.text = s.fullName;
+          if (bio.text.isEmpty) bio.text = s.bio;
+          if (p.gender.isNotEmpty) gender = p.gender;
+          if (p.birthday.isNotEmpty) birthday = p.birthday;
+          if (p.school.isNotEmpty) school.text = p.school;
+          interests = {...s.interests};
+          nonSmoking = s.nonSmoking;
+          early = s.earlySleep;
+          tidy = s.tidy;
+          allowGuests = s.allowGuests;
+        });
+      }
+    } catch (_) {}
   }
 
   void saveDraft() => widget.state.drafts[draftKey] = jsonEncode({
@@ -82,15 +128,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     'school': school.text,
     'min': minimum.text,
     'max': maximum.text,
+    'ownerAddress': ownerAddress.text,
     'gender': gender,
     'district': district,
     'birthday': birthday,
+    'roomCountRange': roomCountRange,
+    'primaryRoomType': primaryRoomType,
     'avatar': avatar.name,
     'avatarPhoto': avatarPhoto?.id,
     'interests': interests.toList(),
-    'smoke': smoke,
+    'operatingDistricts': operatingDistricts.toList(),
+    'nonSmoking': nonSmoking,
+    'smoke': !nonSmoking,
     'early': early,
     'tidy': tidy,
+    'allowGuests': allowGuests,
     'step': step,
   });
   void change(VoidCallback fn) {
@@ -100,11 +152,95 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   @override
   void dispose() {
-    for (final c in [name, mail, bio, school, minimum, maximum]) {
+    for (final c in [
+      name,
+      mail,
+      bio,
+      school,
+      minimum,
+      maximum,
+      ownerAddress,
+    ]) {
       c.dispose();
     }
     super.dispose();
   }
+
+  Widget _buildLifestyleItem({
+    required IconData icon,
+    required String title,
+    required bool isRequired,
+    required Color activeBorderColor,
+    required Color activeBgColor,
+    required Color activeTextColor,
+    required Color activeBadgeBgColor,
+    required Color activeBadgeTextColor,
+    required VoidCallback onTap,
+  }) =>
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: isRequired ? activeBgColor : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isRequired ? activeBorderColor : const Color(0xFFCBD5E1),
+              width: isRequired ? 1.4 : 1.0,
+            ),
+            boxShadow: isRequired
+                ? [
+                    BoxShadow(
+                      color: activeBorderColor.withValues(alpha: 0.10),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    icon,
+                    size: 18,
+                    color: isRequired ? activeBorderColor : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isRequired ? FontWeight.w600 : FontWeight.w500,
+                      color: isRequired ? activeTextColor : const Color(0xFF334155),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isRequired ? activeBadgeBgColor : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isRequired ? 'Bắt buộc' : 'Bất kỳ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isRequired
+                        ? activeBadgeTextColor
+                        : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) => FlowPage(
@@ -137,6 +273,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       kind: avatar,
                       photo: avatarPhoto,
                       size: 90,
+                      imageUrl: avatarPhoto == null
+                          ? (widget.state.avatarUrl ??
+                              widget.state.session.user?.avatarUrl)
+                          : null,
+                      name: name.text.isNotEmpty
+                          ? name.text
+                          : widget.state.fullName,
                     ),
                   ),
                   PrimaryButton(
@@ -298,24 +441,53 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   ),
                 ]),
               if (all || (!owner && step == 2))
-                flowCard('Lối sống', [
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Chấp nhận hút thuốc'),
-                    value: smoke,
-                    onChanged: (v) => change(() => smoke = v),
+                flowCard('Tiêu chí lối sống', [
+                  _buildLifestyleItem(
+                    icon: LucideIcons.cigaretteOff,
+                    title: 'Không hút thuốc',
+                    isRequired: nonSmoking,
+                    activeBorderColor: const Color(0xFF10B981),
+                    activeBgColor: const Color(0xFFECFDF5),
+                    activeTextColor: const Color(0xFF065F46),
+                    activeBadgeBgColor: const Color(0xFFA7F3D0),
+                    activeBadgeTextColor: const Color(0xFF064E3B),
+                    onTap: () => change(() => nonSmoking = !nonSmoking),
                   ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Ngủ sớm'),
-                    value: early,
-                    onChanged: (v) => change(() => early = v),
+                  const SizedBox(height: 8),
+                  _buildLifestyleItem(
+                    icon: LucideIcons.moon,
+                    title: 'Ngủ trước 23h',
+                    isRequired: early,
+                    activeBorderColor: const Color(0xFF6366F1),
+                    activeBgColor: const Color(0xFFEEF2FF),
+                    activeTextColor: const Color(0xFF3730A3),
+                    activeBadgeBgColor: const Color(0xFFC7D2FE),
+                    activeBadgeTextColor: const Color(0xFF312E81),
+                    onTap: () => change(() => early = !early),
                   ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Gọn gàng'),
-                    value: tidy,
-                    onChanged: (v) => change(() => tidy = v),
+                  const SizedBox(height: 8),
+                  _buildLifestyleItem(
+                    icon: LucideIcons.sparkles,
+                    title: 'Gọn gàng, sạch sẽ',
+                    isRequired: tidy,
+                    activeBorderColor: const Color(0xFFF59E0B),
+                    activeBgColor: const Color(0xFFFFFBEB),
+                    activeTextColor: const Color(0xFF92400E),
+                    activeBadgeBgColor: const Color(0xFFFDE68A),
+                    activeBadgeTextColor: const Color(0xFF78350F),
+                    onTap: () => change(() => tidy = !tidy),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildLifestyleItem(
+                    icon: LucideIcons.users,
+                    title: 'Cho bạn bè tới chơi',
+                    isRequired: allowGuests,
+                    activeBorderColor: PT.green,
+                    activeBgColor: PT.mint,
+                    activeTextColor: PT.green,
+                    activeBadgeBgColor: PT.sage,
+                    activeBadgeTextColor: PT.green,
+                    onTap: () => change(() => allowGuests = !allowGuests),
                   ),
                 ]),
               if (all || (!owner && step == 3))
@@ -357,11 +529,72 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         : null,
                   ),
                 ]),
-              if (!all && owner && step == 1)
-                flowCard('Phòng trọ của bạn', [
+              if ((all && owner) || (!all && owner && step == 1))
+                flowCard('Quy mô & Phòng trọ của bạn', [
                   Text(
-                    '${widget.state.myRooms.length} phòng trong tài khoản',
-                    style: PT.body(15),
+                    'Hiện có ${widget.state.myRooms.length} phòng đã đăng trong tài khoản',
+                    style: PT.body(15, PT.green),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: ownerAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Địa chỉ liên hệ chủ trọ',
+                      hintText: 'Số nhà, đường, phường/xã...',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: roomCountRange,
+                    decoration: const InputDecoration(
+                      labelText: 'Số lượng phòng dự kiến cho thuê',
+                    ),
+                    items: ['Chưa có', '1-5', '6-10', 'Trên 10']
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
+                    onChanged: (v) => change(() => roomCountRange = v!),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: primaryRoomType,
+                    decoration: const InputDecoration(
+                      labelText: 'Loại hình phòng cho thuê chính',
+                    ),
+                    items: ['Studio', 'Phòng trọ', 'Căn hộ mini', 'Nguyên căn']
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
+                    onChanged: (v) => change(() => primaryRoomType = v!),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('Khu vực hoạt động chính', style: PT.body(14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      'Quận 10',
+                      'Quận 3',
+                      'Thủ Đức',
+                      'Bình Thạnh',
+                      'Quận 1',
+                      'Quận 7',
+                    ]
+                        .map(
+                          (d) => FilterChip(
+                            label: Text(d),
+                            selected: operatingDistricts.contains(d),
+                            onSelected: (v) => change(() {
+                              if (v) {
+                                operatingDistricts.add(d);
+                              } else if (operatingDistricts.length > 1) {
+                                operatingDistricts.remove(d);
+                              }
+                            }),
+                          ),
+                        )
+                        .toList(),
                   ),
                   const SizedBox(height: 16),
                   PrimaryButton(
@@ -391,11 +624,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               if (!all && step == steps.length - 1)
                 flowCard('Sẵn sàng bắt đầu', [
                   Text(name.text, style: PT.title(24)),
-                  Text(
-                    '$district • ${maximum.text}đ/tháng',
-                    style: PT.body(15),
-                  ),
-                  Text(interests.join(' • ')),
+                  if (owner) ...[
+                    Text(
+                      'Quy mô: $roomCountRange phòng • Loại chính: $primaryRoomType',
+                      style: PT.body(15),
+                    ),
+                    Text('Khu vực: ${operatingDistricts.join(', ')}'),
+                  ] else ...[
+                    Text(
+                      '$district • ${maximum.text}đ/tháng',
+                      style: PT.body(15),
+                    ),
+                    Text(interests.join(' • ')),
+                  ],
                   Text('Xác minh: ${widget.state.verification}'),
                 ]),
             ],
@@ -426,8 +667,24 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     change(() => step++);
                     return;
                   }
-                  final ok = await f.perform(
-                    () => widget.state.workflows.run('profile', () {
+                  final ok = await f.perform(() async {
+                    if (avatarPhoto != null) {
+                      try {
+                        final uploadedUrl =
+                            await widget.state.userRepository.uploadAvatar(
+                          avatarPhoto!.bytes,
+                          avatarPhoto!.name.isNotEmpty
+                              ? avatarPhoto!.name
+                              : 'avatar.jpg',
+                        );
+                        if (uploadedUrl.isNotEmpty) {
+                          widget.state.avatarUrl = uploadedUrl;
+                          widget.state.store.profiles[widget.state.userId]?.avatarUrl =
+                              uploadedUrl;
+                        }
+                      } catch (_) {}
+                    }
+                    return widget.state.workflows.run('profile', () {
                       if (name.text.trim().isEmpty ||
                           (int.tryParse(maximum.text) ?? 0) <
                               (int.tryParse(minimum.text) ?? 0)) {
@@ -440,11 +697,24 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         name.text.trim(),
                         mail.text.trim(),
                         bio.text.trim(),
+                        gender: gender,
+                        birthday: birthday,
+                        school: school.text.trim(),
                       );
-                      widget.state.preferences(interests, smoke, early, tidy);
+                      widget.state.preferences(
+                        interests,
+                        !nonSmoking,
+                        early,
+                        tidy,
+                        allowGuests: allowGuests,
+                      );
                       final p =
                           widget.state.store.profiles[widget.state.userId]!;
                       p.school = school.text.trim();
+                      p.address = ownerAddress.text.trim();
+                      p.roomCountRange = roomCountRange;
+                      p.primaryRoomType = primaryRoomType;
+                      p.operatingDistricts = {...operatingDistricts};
                       p.avatar = avatar;
                       p.avatarPhoto = avatarPhoto;
                       p.gender = gender;
@@ -456,8 +726,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         p.onboardingDone = true;
                       }
                       widget.state.drafts.remove(draftKey);
-                    }),
-                  );
+                    });
+                  });
                   if (ok && ctx.mounted) {
                     widget.onComplete == null
                         ? Navigator.pop(ctx)

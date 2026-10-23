@@ -1,7 +1,17 @@
 import '../mock/fixtures.dart';
-import '../mock/auth_repository.dart';
-import '../mock/room_repository.dart';
 import '../mock/transport.dart';
+import '../api/http_auth_repository.dart';
+import '../api/http_room_repository.dart';
+import '../api/http_admin_repository.dart';
+import '../api/http_matching_repository.dart';
+import '../api/http_rental_repository.dart';
+import '../api/http_chat_repository.dart';
+import '../api/http_user_repository.dart';
+import '../api/http_notification_repository.dart';
+import '../api/http_review_repository.dart';
+import '../api/http_swap_repository.dart';
+import '../api/http_payment_repository.dart';
+import '../api/http_location_repository.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -23,6 +33,16 @@ class AppState extends ChangeNotifier {
   late final SessionController session;
   late final RoomController roomController;
   late final DemoWorkflows workflows;
+  late final HttpAdminRepository adminRepository;
+  late final HttpMatchingRepository matchingRepository;
+  late final HttpRentalRepository rentalRepository;
+  late final HttpChatRepository chatRepository;
+  late final HttpUserRepository userRepository;
+  late final HttpNotificationRepository notificationRepository;
+  late final HttpReviewRepository reviewRepository;
+  late final HttpSwapRepository swapRepository;
+  late final HttpPaymentRepository paymentRepository;
+  late final HttpLocationRepository locationRepository;
   void changed() {
     if (!_disposed) notifyListeners();
   }
@@ -71,19 +91,66 @@ class AppState extends ChangeNotifier {
   }) : store = store ?? DemoStore(),
        mediaPicker = mediaPicker ?? DeviceMediaPicker(),
        transport = transport ?? DemoTransport() {
-    session = SessionController(
-      auth ??
-          DemoAuthRepository(
-            transport: this.transport,
-            isUnavailable: (id) =>
-                this.store.blocked.contains(id) ||
-                this.store.deleted.contains(id),
-          ),
-    );
+    final authRepo = auth ?? HttpAuthRepository();
+    session = SessionController(authRepo);
     workflows = DemoWorkflows(this);
+    adminRepository = HttpAdminRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
+    matchingRepository = HttpMatchingRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
+    rentalRepository = HttpRentalRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
+    chatRepository = HttpChatRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
+    userRepository = HttpUserRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
+    notificationRepository = HttpNotificationRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
+    reviewRepository = HttpReviewRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
+    swapRepository = HttpSwapRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
+    paymentRepository = HttpPaymentRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
+    locationRepository = HttpLocationRepository(
+      tokenProvider: () => authRepo is HttpAuthRepository
+          ? authRepo.accessToken
+          : null,
+    );
     roomController = RoomController(
       this.store,
-      DemoRoomRepository(this.store, this.transport),
+      HttpRoomRepository(
+        tokenProvider: () => authRepo is HttpAuthRepository
+            ? authRepo.accessToken
+            : null,
+      ),
     );
     session.addListener(_sessionChanged);
     roomController.addListener(notifyListeners);
@@ -170,6 +237,23 @@ class AppState extends ChangeNotifier {
     _workspace.bio = value;
   }
 
+  String? get avatarUrl =>
+      _workspace.avatarUrl ??
+      session.user?.avatarUrl ??
+      (userId != null ? store.profiles[userId]?.avatarUrl : null);
+  set avatarUrl(String? value) {
+    _requireSession();
+    _workspace.avatarUrl = value;
+    if (session.user != null) {
+      session.user = session.user!.copyWith(avatarUrl: value);
+    }
+    if (userId != null) {
+      final p = store.profiles[userId];
+      if (p != null) p.avatarUrl = value;
+    }
+    notifyListeners();
+  }
+
   String get verification => _workspace.verification;
   set verification(String value) {
     _requireSession();
@@ -189,12 +273,62 @@ class AppState extends ChangeNotifier {
     if (item == null) return;
     item.read = true;
     notifyListeners();
+    if (authenticated && !id.startsWith('$userId-')) {
+      notificationRepository.markAsRead(id).catchError((_) {});
+    }
   }
+
+  /// Load personal notifications from backend
+  Future<void> loadNotifications() async {
+    if (!authenticated) return;
+    try {
+      final dtos = await notificationRepository.getNotifications();
+      final local = _workspace.notifications;
+      for (final dto in dtos) {
+        final existingIndex = local.indexWhere((n) => n.id == dto.id);
+        if (existingIndex >= 0) {
+          local[existingIndex].read = dto.isRead;
+        } else {
+          local.insert(0, dto.toAppNotification());
+        }
+      }
+      notifyListeners();
+    } catch (_) {}
+    registerDeviceToken().catchError((_) {});
+  }
+
+  /// Dang ky device token FCM (API #76)
+  Future<void> registerDeviceToken([String? token]) async {
+    if (!authenticated) return;
+    try {
+      final t = token ?? 'ptx-fcm-${session.user?.id ?? "client"}';
+      await notificationRepository.registerDeviceToken(
+        t,
+        deviceType: kIsWeb ? 'WEB' : 'ANDROID',
+      );
+    } catch (_) {}
+  }
+
+  /// Goong Maps Autocomplete (API #92)
+  Future<List<LocationPredictionDTO>> autocompleteAddress(String input) =>
+      locationRepository.autocomplete(input);
+
+  /// Goong Maps Geocode (API #93)
+  Future<GeocodeResultDTO> geocodeAddress(String address) =>
+      locationRepository.geocode(address);
+
+  /// Goong Maps Reverse Geocode (API #94)
+  Future<ReverseGeocodeResultDTO> reverseGeocodeCoordinates(
+    double lat,
+    double lng,
+  ) => locationRepository.reverseGeocode(latitude: lat, longitude: lng);
 
   Set<String> get interests => _workspace.interests;
   bool get smoking => _workspace.smoking;
+  bool get nonSmoking => !_workspace.smoking;
   bool get earlySleep => _workspace.earlySleep;
   bool get tidy => _workspace.tidy;
+  bool get allowGuests => _workspace.allowGuests;
   Map<String, bool> get settings => _workspace.settings;
   Map<String, String> get drafts => _workspace.drafts;
   String get district => roomController.district;
@@ -213,9 +347,43 @@ class AppState extends ChangeNotifier {
             p.budget <= personBudget,
       )
       .toList();
+  final Map<String, Room> _roomCache = {};
+  final Map<String, Person> _personCache = {};
 
-  Room? roomById(String id) => store.rooms.where((r) => r.id == id).firstOrNull;
-  Person? personById(String id) => people.where((p) => p.id == id).firstOrNull;
+  void cacheRoom(Room room) {
+    _roomCache[room.id] = room;
+  }
+
+  void cachePerson(Person person) {
+    _personCache[person.id] = person;
+  }
+
+  Room? roomById(String id) {
+    if (_roomCache.containsKey(id)) return _roomCache[id];
+    final fromFeed = roomController.feed.data?.where((r) => r.id == id).firstOrNull;
+    if (fromFeed != null) {
+      _roomCache[id] = fromFeed;
+      return fromFeed;
+    }
+    final fromFiltered = roomController.filtered.where((r) => r.id == id).firstOrNull;
+    if (fromFiltered != null) {
+      _roomCache[id] = fromFiltered;
+      return fromFiltered;
+    }
+    final fromStore = store.rooms.where((r) => r.id == id).firstOrNull;
+    if (fromStore != null) return fromStore;
+    return null;
+  }
+
+  Person? personById(String id) {
+    if (_personCache.containsKey(id)) return _personCache[id];
+    final p = people.where((p) => p.id == id).firstOrNull;
+    if (p != null) {
+      _personCache[id] = p;
+      return p;
+    }
+    return null;
+  }
   Conversation? conversationById(String id) =>
       conversations.where((c) => c.id == id).firstOrNull;
   Rental? rentalById(String id) => rentals.where((r) => r.id == id).firstOrNull;
@@ -237,10 +405,186 @@ class AppState extends ChangeNotifier {
     ),
   };
   Future<void> loadRooms() => roomController.load();
+  Future<void> loadPeople() async {
+    if (!authenticated) return;
+    try {
+      final list = await matchingRepository.getFeed();
+      if (list.isNotEmpty) {
+        people
+          ..clear()
+          ..addAll(list);
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  /// Load rentals from backend; purges mock data when authenticated.
+  Future<void> loadRentals() async {
+    if (!authenticated) return;
+    try {
+      List<RentalDTO> dtos;
+      if (role == UserRole.landlord) {
+        dtos = await rentalRepository.getMyLandlordRentals();
+      } else {
+        dtos = await rentalRepository.getMyTenantRentals();
+      }
+      final live = dtos.map((d) => d.toRental()).toList();
+      // Purge fake mock rentals and replace with real server rentals
+      store.rentals
+        ..removeWhere(
+          (r) => role == UserRole.landlord
+              ? r.landlordId == userId
+              : r.tenantId == userId,
+        )
+        ..removeWhere((r) => r.id.startsWith('lease-'))
+        ..addAll(live);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// API #53: Yêu cầu thuê phòng (Tạo hợp đồng)
+  Future<RentalDTO> createRental({
+    required String roomId,
+    required String startDate,
+    required String endDate,
+    String? message,
+  }) async {
+    _requireSession();
+    final dto = await rentalRepository.createRental(
+      roomId: roomId,
+      startDate: startDate,
+      endDate: endDate,
+      message: message,
+    );
+    final rental = dto.toRental();
+    store.rentals.removeWhere((r) => r.id == rental.id);
+    store.rentals.add(rental);
+    notifyListeners();
+    return dto;
+  }
+
+  /// API #59: Kết thúc hợp đồng thuê & Hoàn tất cọc
+  Future<void> terminateRental(String rentalId) async {
+    _requireSession(UserRole.landlord);
+    await rentalRepository.terminateRental(rentalId);
+    final local = rentals.where((r) => r.id == rentalId).firstOrNull;
+    if (local != null) {
+      local.status = RentalStatus.terminated;
+      notifyListeners();
+    }
+  }
+
+  /// Load conversations from backend; merges with local state.
+  Future<void> loadConversations() async {
+    if (!authenticated) return;
+    try {
+      final dtos = await chatRepository.getConversations();
+      if (dtos.isEmpty) return;
+      final local = _workspace.conversations;
+      for (final dto in dtos) {
+        final existing = local.where((c) => c.id == dto.id).firstOrNull;
+        if (existing != null) {
+          existing.unread = dto.unreadCount;
+        } else {
+          local.add(dto.toConversation());
+        }
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Load user profile from backend and sync into local workspace.
+  Future<void> loadUserProfile() async {
+    if (!authenticated) return;
+    try {
+      final dto = await userRepository.getMe();
+      // Sync names and profile info
+      if (dto.fullName.isNotEmpty) fullName = dto.fullName;
+      if (dto.email.isNotEmpty) email = dto.email;
+      if (dto.bio != null && dto.bio!.isNotEmpty) bio = dto.bio!;
+      if (dto.interests != null && dto.interests!.isNotEmpty) {
+        _workspace.interests = dto.interests!.toSet();
+      }
+      // Sync avatarUrl
+      if (dto.avatarUrl != null && dto.avatarUrl!.isNotEmpty) {
+        avatarUrl = dto.avatarUrl;
+      }
+      // Sync profile details in store
+      final p = store.profiles[userId];
+      if (p != null) {
+        if (dto.gender != null && dto.gender!.isNotEmpty) p.gender = dto.gender!;
+        if (dto.birthday != null && dto.birthday!.isNotEmpty) p.birthday = dto.birthday!;
+        if (dto.school != null && dto.school!.isNotEmpty) p.school = dto.school!;
+        if (dto.avatarUrl != null && dto.avatarUrl!.isNotEmpty) p.avatarUrl = dto.avatarUrl;
+        p.trustScore = dto.trustScore;
+      }
+      try {
+        final ts = await userRepository.getTrustScore();
+        if (p != null) p.trustScore = ts.currentScore;
+      } catch (_) {}
+      // Sync KYC status
+      if (dto.kycStatus != null) verification = dto.kycStatus!;
+      // Sync quotas
+      if (dto.roomSwipeQuota >= 0) roomQuota = dto.roomSwipeQuota;
+      if (dto.roommateSwipeQuota >= 0) roommateQuota = dto.roommateSwipeQuota;
+
+      // Sync settings (API #22)
+      try {
+        final userSettings = await userRepository.getSettings();
+        settings['public'] = userSettings.isPublic;
+        settings['showSchool'] = userSettings.showSchool;
+        settings['hideActiveStatus'] = userSettings.hideActiveStatus;
+      } catch (_) {}
+
+      // Sync matching profile (API #16)
+      if (role == UserRole.tenant) {
+        try {
+          final mp = await userRepository.getMatchingProfile();
+          if (mp.interests.isNotEmpty) _workspace.interests = mp.interests.toSet();
+          if (mp.nonSmoking != null) _workspace.smoking = !mp.nonSmoking!;
+          if (mp.earlySleeper != null) _workspace.earlySleep = mp.earlySleeper!;
+          if (mp.isNeat != null) _workspace.tidy = mp.isNeat!;
+          if (mp.allowGuests != null) _workspace.allowGuests = mp.allowGuests!;
+        } catch (_) {}
+      }
+
+      // Sync consumables (API #78)
+      try {
+        final consumables = await paymentRepository.getMyConsumables();
+        if (consumables.swipesLeft >= 0) roomQuota = consumables.swipesLeft;
+        final p = store.profiles[userId];
+        if (p != null) {
+          p.boosts = consumables.boostsLeft;
+        }
+      } catch (_) {}
+
+      // Sync active subscription
+      try {
+        final subs = await paymentRepository.getMySubscriptions();
+        if (subs.isNotEmpty) {
+          final p = store.profiles[userId];
+          if (p != null) {
+            p.package = subs.first.planName;
+            if (subs.first.endDate != null) {
+              p.packageExpiry = DateTime.tryParse(subs.first.endDate!);
+            }
+          }
+        }
+      } catch (_) {}
+
+      notifyListeners();
+    } catch (_) {}
+  }
   Future<bool> authenticate(String login, String password) =>
       session.signIn(login, password);
+  Future<bool> authenticateWithGoogle(String idToken, {String role = 'TENANT'}) =>
+      session.loginWithGoogle(idToken, role: role);
   void logout() {
     _workspace.drafts.clear();
+    final repo = session.repository;
+    if (repo is HttpAuthRepository) {
+      repo.logout();
+    }
     session.logout();
   }
 
@@ -271,6 +615,10 @@ class AppState extends ChangeNotifier {
       gender = 'Nữ';
       habit = 'Tất cả';
       personBudget = 2500000;
+      if (authenticated) {
+        loadUserProfile();
+        loadConversations();
+      }
     }
     notifyListeners();
   }
@@ -285,13 +633,29 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void preferences(Set<String> selected, bool smoke, bool early, bool clean) {
+  void preferences(
+    Set<String> selected,
+    bool smoke,
+    bool early,
+    bool clean, {
+    bool? allowGuests,
+  }) {
     _requireSession();
     _workspace.interests = {...selected};
     _workspace.smoking = smoke;
     _workspace.earlySleep = early;
     _workspace.tidy = clean;
+    if (allowGuests != null) _workspace.allowGuests = allowGuests;
     notifyListeners();
+    if (authenticated && role == UserRole.tenant) {
+      userRepository.updateMatchingProfile(
+        interests: selected.toList(),
+        nonSmoking: !smoke,
+        earlySleeper: early,
+        isNeat: clean,
+        allowGuests: allowGuests ?? _workspace.allowGuests,
+      ).catchError((_) {});
+    }
   }
 
   bool isSaved(String id) => saved.contains(id);
@@ -303,7 +667,13 @@ class AppState extends ChangeNotifier {
         'Không tìm thấy phòng.',
       );
     }
-    if (!saved.add(id)) saved.remove(id);
+    final repo = roomController.repository;
+    if (!saved.add(id)) {
+      saved.remove(id);
+      if (repo is HttpRoomRepository) repo.unsaveRoom(id);
+    } else {
+      if (repo is HttpRoomRepository) repo.saveRoom(id);
+    }
     notifyListeners();
   }
 
@@ -317,6 +687,21 @@ class AppState extends ChangeNotifier {
     if (like) {
       final id = person ? filteredPeople[index].id : filteredRooms[index].id;
       if ((person ? liked : saved).add(id)) savedId = id;
+      if (!person) {
+        final repo = roomController.repository;
+        if (repo is HttpRoomRepository) repo.swipeRoom(id, true);
+      } else {
+        matchingRepository.swipe(id, true);
+      }
+    } else {
+      if (!person) {
+        final id = filteredRooms[index].id;
+        final repo = roomController.repository;
+        if (repo is HttpRoomRepository) repo.swipeRoom(id, false);
+      } else {
+        final id = filteredPeople[index].id;
+        matchingRepository.swipe(id, false);
+      }
     }
     _history.add((
       person: person,
@@ -388,10 +773,15 @@ class AppState extends ChangeNotifier {
       personIndex = 0;
     } else {
       roomIndex = 0;
+      final repo = roomController.repository;
+      if (repo is HttpRoomRepository) {
+        repo.resetSwipes().catchError((_) {});
+      }
     }
     _history.removeWhere((h) => h.person == person);
     notifyListeners();
   }
+
 
   void send(Conversation c, String text) {
     _requireSession();
@@ -435,7 +825,7 @@ class AppState extends ChangeNotifier {
     if (!conversations.contains(c)) {
       throw const RepositoryFailure(
         RepositoryFault.denied,
-        'Hội thoại không thuộc tài khoản này.',
+        'Hoi thoai khong thuoc tai khoan nay.',
       );
     }
     final workspace = _workspace;
@@ -454,7 +844,7 @@ class AppState extends ChangeNotifier {
       if (roomId != null && roomById(roomId) == null) {
         throw const RepositoryFailure(
           RepositoryFault.missing,
-          'Phòng không còn tồn tại.',
+          'Phong khong con ton tai.',
         );
       }
       final now = DateTime.now();
@@ -473,14 +863,44 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     MessageDelivery delivery;
     try {
-      await transport.run(() {
-        if (_disposed || userId != user || session.revision != revision) {
-          throw const RepositoryFailure(
-            RepositoryFault.denied,
-            'Phiên đã kết thúc.',
-          );
+      // Try real API first if authenticated
+      final authRepo = session.repository;
+      final token = authRepo is HttpAuthRepository ? authRepo.accessToken : null;
+      if (token != null) {
+        String targetConvId = c.id;
+        if (targetConvId.startsWith('$userId-') && c.participantId.isNotEmpty) {
+          try {
+            final convDto = await chatRepository.createConversation(
+              partnerId: c.participantId,
+              roomId: c.roomId,
+              type: c.roomId != null ? 'ROOM' : 'ROOMMATE',
+            );
+            c.id = convDto.id;
+            targetConvId = convDto.id;
+          } catch (_) {}
         }
-      });
+        if (!targetConvId.startsWith('$userId-')) {
+          await chatRepository.sendMessage(targetConvId, outgoing.text);
+        } else {
+          await transport.run(() {
+            if (_disposed || userId != user || session.revision != revision) {
+              throw const RepositoryFailure(
+                RepositoryFault.denied,
+                'Phien da ket thuc.',
+              );
+            }
+          });
+        }
+      } else {
+        await transport.run(() {
+          if (_disposed || userId != user || session.revision != revision) {
+            throw const RepositoryFailure(
+              RepositoryFault.denied,
+              'Phien da ket thuc.',
+            );
+          }
+        });
+      }
       delivery = MessageDelivery.sent;
     } catch (_) {
       delivery = MessageDelivery.failed;
@@ -583,8 +1003,30 @@ class AppState extends ChangeNotifier {
     return created;
   }
 
-  String? checkIn(String code, {String? rentalId}) {
+  Future<String?> checkIn(String code, {String? rentalId}) async {
     _requireSession(UserRole.tenant);
+    // If rentalId is given, try the real API first
+    if (rentalId != null) {
+      try {
+        final dto = await rentalRepository.verifyCheckIn(rentalId, code);
+        // Update local state
+        final local = rentals.where((r) => r.id == rentalId).firstOrNull;
+        if (local != null) {
+          local.checkedIn = true;
+          local.status = RentalStatus.active;
+        } else {
+          // Add the newly activated rental to local store
+          store.rentals.add(dto.toRental());
+        }
+        notifyListeners();
+        return null; // success
+      } on RepositoryFailure catch (e) {
+        return e.message;
+      } catch (_) {
+        // Fall through to local demo check
+      }
+    }
+    // Fallback: local QR code matching (demo / offline)
     final rental = rentals
         .where(
           (r) =>
@@ -593,20 +1035,21 @@ class AppState extends ChangeNotifier {
         )
         .firstOrNull;
     if (rental == null) {
-      return 'Mã không hợp lệ hoặc không thuộc hợp đồng của bạn.';
+      return 'Ma khong hop le hoac khong thuoc hop dong cua ban.';
     }
     if (rental.status != RentalStatus.active &&
         rental.status != RentalStatus.pending) {
-      return 'Hợp đồng không còn hiệu lực.';
+      return 'Hop dong khong con hieu luc.';
     }
-    if (rental.checkedIn) return 'Mã này đã được sử dụng.';
+    if (rental.checkedIn) return 'Ma nay da duoc su dung.';
     if (rental.codeExpiresAt?.isBefore(DateTime.now()) == true) {
-      return 'Mã đã hết hạn. Hãy liên hệ chủ trọ.';
+      return 'Ma da het han. Hay lien he chu tro.';
     }
     rental.checkedIn = true;
     notifyListeners();
     return null;
   }
+
 
   void review(String id, int rating, String comment) {
     _requireSession();
@@ -642,12 +1085,34 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateProfile(String name, String mail, String description) {
+  void updateProfile(
+    String name,
+    String mail,
+    String description, {
+    String? gender,
+    String? birthday,
+    String? school,
+  }) {
     _requireSession();
     fullName = name;
     email = mail;
     bio = description;
+    final p = store.profiles[userId];
+    if (p != null) {
+      if (gender != null && gender.isNotEmpty) p.gender = gender;
+      if (birthday != null && birthday.isNotEmpty) p.birthday = birthday;
+      if (school != null && school.isNotEmpty) p.school = school;
+    }
     notifyListeners();
+    if (authenticated) {
+      userRepository.updateMe(
+        fullName: name,
+        bio: description,
+        gender: gender,
+        birthday: birthday,
+        school: school,
+      ).then<void>((_) {}, onError: (_) {});
+    }
   }
 
   void setSetting(String key, bool value) {
@@ -761,6 +1226,9 @@ class AppState extends ChangeNotifier {
       item.read = true;
     }
     notifyListeners();
+    if (authenticated) {
+      notificationRepository.markAllAsRead().catchError((_) {});
+    }
   }
 
   @override

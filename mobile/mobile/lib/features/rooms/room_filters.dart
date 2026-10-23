@@ -56,18 +56,19 @@ class _RoomFilterSheetState extends State<RoomFilterSheet> {
       child: SizedBox(
         height: math.max(
           220,
-          MediaQuery.sizeOf(context).height * .88 -
+          MediaQuery.sizeOf(context).height * .82 -
               MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 8, 8),
+              padding: const EdgeInsets.fromLTRB(16, 6, 8, 4),
               child: Row(
                 children: [
-                  Expanded(child: Text('Bộ lọc phòng', style: PT.title(25))),
+                  Expanded(child: Text('Bộ lọc phòng', style: PT.title(20))),
                   IconButton(
                     tooltip: 'Đóng bộ lọc',
+                    visualDensity: VisualDensity.compact,
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(LucideIcons.x),
                   ),
@@ -80,7 +81,7 @@ class _RoomFilterSheetState extends State<RoomFilterSheet> {
                 child: ListView(
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                   children: [
                     TextFormField(
                       controller: query,
@@ -89,45 +90,69 @@ class _RoomFilterSheetState extends State<RoomFilterSheet> {
                         prefixIcon: Icon(LucideIcons.search),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Text('Ngân sách mỗi tháng (đ)', style: PT.body(15)),
                     const SizedBox(height: 10),
-                    // Stack on narrow screens so price and inline errors remain readable.
-                    TextFormField(
-                      controller: minimum,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Giá tối thiểu',
-                      ),
-                      validator: (v) => (int.tryParse(v ?? '') ?? -1) >= 0
-                          ? null
-                          : 'Nhập số tiền từ 0 trở lên',
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: maximum,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Giá tối đa',
-                      ),
-                      validator: (v) {
-                        final max = int.tryParse(v ?? '');
-                        final min = int.tryParse(minimum.text);
-                        return max == null || max < 0
-                            ? 'Nhập số tiền hợp lệ'
-                            : min != null && max < min
-                            ? 'Giá tối đa phải từ giá tối thiểu trở lên'
-                            : null;
+                    Text('Ngân sách mỗi tháng (đ)', style: PT.body(13)),
+                    const SizedBox(height: 6),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final minField = TextFormField(
+                          controller: minimum,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Giá tối thiểu',
+                          ),
+                          validator: (v) => (int.tryParse(v ?? '') ?? -1) >= 0
+                              ? null
+                              : 'Nhập số tiền từ 0 trở lên',
+                        );
+                        final maxField = TextFormField(
+                          controller: maximum,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Giá tối đa',
+                          ),
+                          validator: (v) {
+                            final max = int.tryParse(v ?? '');
+                            final min = int.tryParse(minimum.text);
+                            return max == null || max < 0
+                                ? 'Nhập số tiền hợp lệ'
+                                : min != null && max < min
+                                ? 'Giá tối đa phải từ giá tối thiểu trở lên'
+                                : null;
+                          },
+                        );
+                        final sideBySide =
+                            constraints.maxWidth >= 320 &&
+                            MediaQuery.textScalerOf(context).scale(12) <= 15;
+                        if (sideBySide) {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: minField),
+                              const SizedBox(width: 10),
+                              Expanded(child: maxField),
+                            ],
+                          );
+                        }
+                        return Column(
+                          children: [
+                            minField,
+                            const SizedBox(height: 8),
+                            maxField,
+                          ],
+                        );
                       },
                     ),
-                    const SizedBox(height: 20),
-                    Text('Khu vực', style: PT.body(15)),
+                    const SizedBox(height: 10),
+                    Text('Khu vực', style: PT.body(13)),
+                    const SizedBox(height: 4),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
+                      spacing: 6,
+                      runSpacing: 4,
                       children: districts
                           .map(
                             (d) => ChoiceChip(
+                              visualDensity: VisualDensity.compact,
                               label: Text(d),
                               selected: district == d,
                               onSelected: (_) => setState(() => district = d),
@@ -135,14 +160,16 @@ class _RoomFilterSheetState extends State<RoomFilterSheet> {
                           )
                           .toList(),
                     ),
-                    const SizedBox(height: 16),
-                    Text('Loại phòng', style: PT.body(15)),
+                    const SizedBox(height: 10),
+                    Text('Loại phòng', style: PT.body(13)),
+                    const SizedBox(height: 4),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
+                      spacing: 6,
+                      runSpacing: 4,
                       children: types
                           .map(
                             (t) => ChoiceChip(
+                              visualDensity: VisualDensity.compact,
                               label: Text(t),
                               selected: type == t,
                               onSelected: (_) => setState(() => type = t),
@@ -150,14 +177,16 @@ class _RoomFilterSheetState extends State<RoomFilterSheet> {
                           )
                           .toList(),
                     ),
-                    const SizedBox(height: 16),
-                    Text('Tiện ích cần có', style: PT.body(15)),
+                    const SizedBox(height: 10),
+                    Text('Tiện ích cần có', style: PT.body(13)),
+                    const SizedBox(height: 4),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
+                      spacing: 6,
+                      runSpacing: 4,
                       children: options
                           .map(
                             (a) => FilterChip(
+                              visualDensity: VisualDensity.compact,
                               label: Text(a),
                               selected: amenities.contains(a),
                               onSelected: (v) => setState(() {
@@ -167,7 +196,7 @@ class _RoomFilterSheetState extends State<RoomFilterSheet> {
                           )
                           .toList(),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       isExpanded: true,
                       initialValue: sort,
@@ -196,28 +225,31 @@ class _RoomFilterSheetState extends State<RoomFilterSheet> {
             SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-                child: Column(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                child: Row(
                   children: [
-                    PrimaryButton(
-                      'Áp dụng bộ lọc',
-                      onTap: () {
-                        if (!form.currentState!.validate()) return;
-                        widget.state.applyRoomFilters(
-                          district: district,
-                          type: type,
-                          minPrice: double.parse(minimum.text),
-                          maxPrice: double.parse(maximum.text),
-                          query: query.text.trim(),
-                          amenities: amenities,
-                          sort: sort,
-                        );
-                        Navigator.pop(context);
-                      },
-                    ),
                     TextButton(
                       onPressed: clear,
                       child: const Text('Xóa bộ lọc'),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: PrimaryButton(
+                        'Áp dụng bộ lọc',
+                        onTap: () {
+                          if (!form.currentState!.validate()) return;
+                          widget.state.applyRoomFilters(
+                            district: district,
+                            type: type,
+                            minPrice: double.parse(minimum.text),
+                            maxPrice: double.parse(maximum.text),
+                            query: query.text.trim(),
+                            amenities: amenities,
+                            sort: sort,
+                          );
+                          Navigator.pop(context);
+                        },
+                      ),
                     ),
                   ],
                 ),

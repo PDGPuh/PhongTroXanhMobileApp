@@ -81,7 +81,51 @@ class FlowPageState extends State<FlowPage> {
       builder: (context, _) => loading
           ? Center(
               child: error == null
-                  ? const CircularProgressIndicator()
+                  ? RepaintBoundary(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.8,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: PT.card(color: const Color(0xFFF7FAF9)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    height: 14,
+                                    width: 140,
+                                    decoration: BoxDecoration(
+                                      color: PT.mint,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    height: 11,
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: PT.grey,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                   : Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
@@ -96,14 +140,14 @@ class FlowPageState extends State<FlowPage> {
             )
           : ListView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
               children: [
                 if (error != null)
                   Semantics(
                     liveRegion: true,
                     child: Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(error!, style: PT.body(15, PT.error)),
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(error!, style: PT.body(14, PT.error)),
                     ),
                   ),
                 ...widget.content(context, this),
@@ -114,16 +158,16 @@ class FlowPageState extends State<FlowPage> {
 }
 
 Widget flowCard(String title, List<Widget> children) => Container(
-  padding: const EdgeInsets.all(16),
-  margin: const EdgeInsets.only(bottom: 14),
+  padding: const EdgeInsets.all(12),
+  margin: const EdgeInsets.only(bottom: 10),
   decoration: PT.card(),
   child: Material(
     color: Colors.transparent,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: PT.title(22)),
-        const SizedBox(height: 12),
+        Text(title, style: PT.title(17)),
+        const SizedBox(height: 8),
         ...children,
       ],
     ),
@@ -138,7 +182,7 @@ Future<bool> confirmAction(
     await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(title, style: PT.title(23)),
+        title: Text(title, style: PT.title(20)),
         content: Text(text),
         actions: [
           TextButton(
@@ -159,15 +203,15 @@ class DemoDocumentPreview extends StatelessWidget {
   const DemoDocumentPreview({super.key, required this.side});
   @override
   Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 140),
+    constraints: const BoxConstraints(minHeight: 96),
     width: double.infinity,
-    padding: const EdgeInsets.all(14),
+    padding: const EdgeInsets.all(10),
     decoration: PT.card(color: PT.mint),
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.badge_outlined, size: 40, color: PT.green),
-        Text('$side • Tài liệu mẫu', style: PT.title(18)),
+        const Icon(Icons.badge_outlined, size: 30, color: PT.green),
+        Text('$side • Tài liệu mẫu', style: PT.title(15)),
         const Text('DEMO — không chứa danh tính thật'),
       ],
     ),

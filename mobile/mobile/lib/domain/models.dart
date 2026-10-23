@@ -66,20 +66,28 @@ class Room {
       description,
       electricity,
       water,
-      otherFees;
-  final int price, area, floor, match;
+      otherFees,
+      internetFee,
+      parkingFee,
+      serviceFee;
+  final int price, deposit, area, floor, match, contactCount;
   final List<String> amenities;
   final String landlordId, landlordName;
+  final String? landlordAvatarUrl;
+  final String? landlordPhone;
   final RoomStatus status;
   final List<PhotoKind> images;
   final List<LocalPhoto> localPhotos;
   int get imageCount => images.length + localPhotos.length;
   final double? latitude, longitude;
+  final DateTime? expiresAt;
+  final bool isBoosted;
   const Room({
     required this.id,
     required this.title,
     required this.district,
     required this.price,
+    int? deposit,
     this.area = 20,
     this.floor = 3,
     this.match = 92,
@@ -88,31 +96,50 @@ class Room {
     this.description = 'Studio xanh, thoáng mát, gần Bách Khoa. Phòng full nội thất mới, có ban công đón nắng, khu vực an ninh, yên tĩnh, thuận tiện di chuyển sang các quận trung tâm. Phù hợp cho sinh viên và người đi làm yêu thích không gian sống xanh, sạch, gọn gàng.',
     this.electricity = '3.500đ/kWh',
     this.water = '100.000đ/người',
+    this.internetFee = 'Miễn phí',
+    this.parkingFee = 'Miễn phí',
+    this.serviceFee = '50.000đ/phòng',
     this.otherFees = 'Wifi, giữ xe miễn phí. Đặt cọc 1 tháng tiền phòng.',
     this.landlordId = 'owner-a',
     this.landlordName = 'Cô Hồng',
+    this.landlordAvatarUrl,
+    this.landlordPhone,
     this.status = RoomStatus.available,
     this.images = const [PhotoKind.room],
     this.localPhotos = const [],
     this.latitude = 10.7626,
     this.longitude = 106.6697,
+    this.expiresAt,
+    this.isBoosted = false,
+    this.contactCount = 4,
     this.amenities = const [
       'Có nội thất',
       'Wifi riêng',
       'Máy lạnh',
       'Bếp riêng',
     ],
-  });
+  }) : deposit = deposit ?? price;
   String get priceLabel => '${_money(price)}đ/tháng';
+  String get depositLabel => '${_money(deposit)}đ';
   Room copyWith({
     RoomStatus? status,
     String? landlordId,
     String? landlordName,
+    String? landlordAvatarUrl,
+    String? landlordPhone,
+    int? deposit,
+    String? internetFee,
+    String? parkingFee,
+    String? serviceFee,
+    DateTime? expiresAt,
+    bool? isBoosted,
+    int? contactCount,
   }) => Room(
     id: id,
     title: title,
     district: district,
     price: price,
+    deposit: deposit ?? this.deposit,
     area: area,
     floor: floor,
     match: match,
@@ -121,15 +148,23 @@ class Room {
     description: description,
     electricity: electricity,
     water: water,
+    internetFee: internetFee ?? this.internetFee,
+    parkingFee: parkingFee ?? this.parkingFee,
+    serviceFee: serviceFee ?? this.serviceFee,
     otherFees: otherFees,
     amenities: amenities,
     images: images,
     localPhotos: localPhotos,
     latitude: latitude,
     longitude: longitude,
+    expiresAt: expiresAt ?? this.expiresAt,
+    isBoosted: isBoosted ?? this.isBoosted,
+    contactCount: contactCount ?? this.contactCount,
     status: status ?? this.status,
     landlordId: landlordId ?? this.landlordId,
     landlordName: landlordName ?? this.landlordName,
+    landlordAvatarUrl: landlordAvatarUrl ?? this.landlordAvatarUrl,
+    landlordPhone: landlordPhone ?? this.landlordPhone,
   );
 }
 
@@ -190,7 +225,8 @@ class ChatMessage {
 }
 
 class Conversation {
-  final String id, name, time, subtitle;
+  String id;
+  final String name, time, subtitle;
   final String participantId, participantName;
   final String? roomId;
   final PhotoKind photo;
@@ -216,9 +252,12 @@ class Rental {
   final Room room;
   String code;
   final String id, tenantId, landlordId;
-  final RentalStatus status;
+  RentalStatus status;
   DateTime? codeExpiresAt;
   bool checkedIn;
+  bool handoverConfirmed;
+  final String startDate;
+  String? terminationReason;
   Rental(
     this.room,
     this.code, {
@@ -227,6 +266,9 @@ class Rental {
     String? landlordId,
     this.status = RentalStatus.active,
     this.checkedIn = true,
+    this.handoverConfirmed = false,
+    this.startDate = '01/09/2026',
+    this.terminationReason,
     this.codeExpiresAt,
   }) : id = id ?? 'rental-${room.id}',
        landlordId = landlordId ?? room.landlordId;

@@ -190,4 +190,9 @@ class DemoAuthRepository
     _accounts[normalized] = (user: user, password: password);
     return user;
   });
+
+  @override
+  Future<SessionUser> loginWithGoogle(String idToken, {String role = 'TENANT'}) => transport.run(() {
+    return _accounts.values.firstOrNull?.user ?? accounts.first;
+  });
 }

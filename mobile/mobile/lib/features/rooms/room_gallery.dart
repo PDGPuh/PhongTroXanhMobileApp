@@ -15,7 +15,7 @@ class RoomGallery extends StatefulWidget {
   const RoomGallery({
     super.key,
     required this.room,
-    this.height = 270,
+    this.height = 195,
     this.allowSwipe = true,
   });
   @override
@@ -65,27 +65,28 @@ class _RoomGalleryState extends State<RoomGallery> {
             ),
           ),
           Positioned(
-            bottom: 12,
-            right: 12,
+            bottom: 8,
+            right: 10,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 '${index + 1}/$count',
-                style: PT.body(13, Colors.white),
+                style: PT.body(11, Colors.white),
               ),
             ),
           ),
           if (count > 1)
             Positioned(
-              bottom: 12,
-              left: 12,
+              bottom: 8,
+              left: 10,
               child: RoundButton(
                 icon: LucideIcons.chevronRight,
                 label: 'Ảnh phòng tiếp theo',
+                size: 32,
                 background: Colors.white,
                 onTap: () => pager.animateToPage(
                   (index + 1) % count,

@@ -31,6 +31,37 @@
 
   <title>phong_tro_xanh_mobile</title>
   <link rel="manifest" href="manifest.json">
+  <meta name="google-signin-client_id" content="26308985257-c3tkae8c2jjtgs1biimctm2ga0h70fc0.apps.googleusercontent.com">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    window.launchGoogleSignIn = function(clientId) {
+      if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+        if (window.onGoogleAuthCallback) window.onGoogleAuthCallback(null, "Google Identity Services chưa tải xong.");
+        return;
+      }
+      try {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: function(res) {
+            if (res && res.credential) {
+              if (window.onGoogleAuthCallback) window.onGoogleAuthCallback(res.credential, null);
+            } else {
+              if (window.onGoogleAuthCallback) window.onGoogleAuthCallback(null, "Không nhận được token từ Google.");
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        window.google.accounts.id.prompt(function(notification) {
+          if (notification && (notification.isNotDisplayed() || notification.isSkippedMoment())) {
+            console.warn("Google One-Tap notification:", notification);
+          }
+        });
+      } catch (err) {
+        if (window.onGoogleAuthCallback) window.onGoogleAuthCallback(null, err.toString());
+      }
+    };
+  </script>
 </head>
 <body>
   <!--

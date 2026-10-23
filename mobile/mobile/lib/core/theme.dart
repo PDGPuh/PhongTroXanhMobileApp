@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 abstract final class PT {
@@ -24,34 +25,34 @@ abstract final class PT {
     fontWeight: FontWeight.w600,
     fontVariations: const [FontVariation('wght', 600)],
     color: deep,
-    height: 1.3,
+    height: 1.2,
     letterSpacing: -.1,
   );
-  static TextStyle title([double size = 26]) => TextStyle(
+  static TextStyle title([double size = 24]) => TextStyle(
     fontFamily: uiFont,
-    fontSize: size < 15 ? 15 : size,
+    fontSize: size < 13 ? 13 : size,
     fontWeight: FontWeight.w600,
     color: deep,
-    height: 1.35,
-    letterSpacing: size >= 26 ? -.25 : 0,
+    height: 1.25,
+    letterSpacing: size >= 24 ? -.25 : 0,
   );
-  static TextStyle body([double size = 15, Color color = deep]) => TextStyle(
+  static TextStyle body([double size = 14, Color color = deep]) => TextStyle(
     fontFamily: uiFont,
-    fontSize: size < 12 ? 12 : (size <= 14 ? size + 1 : size),
+    fontSize: size < 11 ? 11 : size,
     fontWeight: FontWeight.w400,
     color: color,
-    height: 1.5,
+    height: 1.35,
     letterSpacing: 0,
   );
   static TextStyle caption([Color color = muted]) => TextStyle(
     fontFamily: uiFont,
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: FontWeight.w400,
     color: color,
-    height: 1.4,
+    height: 1.28,
     letterSpacing: 0,
   );
-  static TextStyle price([double size = 22]) => title(
+  static TextStyle price([double size = 20]) => title(
     size,
   ).copyWith(color: green, fontFeatures: const [FontFeature.tabularFigures()]);
   static BoxDecoration card({Color color = Colors.white, double radius = 14}) =>
@@ -62,16 +63,27 @@ abstract final class PT {
         boxShadow: [
           BoxShadow(
             color: deep.withValues(alpha: .035),
-            blurRadius: 16,
-            offset: const Offset(0, 5),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       );
   static ThemeData get theme => ThemeData(
     useMaterial3: true,
     fontFamily: uiFont,
+    visualDensity: VisualDensity.compact,
+    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     iconTheme: const IconThemeData(color: deep),
     scaffoldBackgroundColor: Colors.white,
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+      },
+    ),
     colorScheme: ColorScheme.fromSeed(
       seedColor: green,
       primary: green,
@@ -79,19 +91,19 @@ abstract final class PT {
       onSurface: deep,
     ),
     textTheme: TextTheme(
-      displayLarge: title(40),
-      displayMedium: title(36),
-      displaySmall: title(32),
-      headlineLarge: title(30),
-      headlineMedium: title(28),
-      headlineSmall: title(24),
-      titleLarge: title(22),
-      titleMedium: title(17),
-      titleSmall: title(15),
-      bodyLarge: body(16),
-      bodyMedium: body(),
+      displayLarge: title(34),
+      displayMedium: title(30),
+      displaySmall: title(26),
+      headlineLarge: title(24),
+      headlineMedium: title(22),
+      headlineSmall: title(20),
+      titleLarge: title(18),
+      titleMedium: title(15),
+      titleSmall: title(14),
+      bodyLarge: body(15),
+      bodyMedium: body(14),
       bodySmall: body(12),
-      labelLarge: body(14).copyWith(fontWeight: FontWeight.w500),
+      labelLarge: body(13).copyWith(fontWeight: FontWeight.w500),
       labelMedium: body(12).copyWith(fontWeight: FontWeight.w500),
       labelSmall: caption().copyWith(fontWeight: FontWeight.w500),
     ),
@@ -101,22 +113,24 @@ abstract final class PT {
       foregroundColor: deep,
       centerTitle: false,
       elevation: 0,
+      toolbarHeight: 46,
     ),
     inputDecorationTheme: InputDecorationTheme(
+      isDense: true,
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      hintStyle: body(14, muted),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      hintStyle: body(13, muted),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: line),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: line),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: green),
       ),
     ),

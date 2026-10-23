@@ -102,17 +102,31 @@ class _CompareRoomsScreenState extends State<CompareRoomsScreen> {
             ),
             const SizedBox(height: 12),
             for (final room in rooms)
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(room.title, style: PT.body(15)),
-                subtitle: Text('${room.priceLabel} • ${room.status.label}'),
-                value: selected.contains(room.id),
-                onChanged: busy
-                    ? null
-                    : (v) => setState(() {
-                        v! ? selected.add(room.id) : selected.remove(room.id);
-                        result.clear();
-                      }),
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: PT.card(
+                  color: selected.contains(room.id) ? PT.mint : Colors.white,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: CheckboxListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    title: Text(room.title, style: PT.body(15)),
+                    subtitle: Text('${room.priceLabel} • ${room.status.label}'),
+                    value: selected.contains(room.id),
+                    onChanged: busy
+                        ? null
+                        : (v) => setState(() {
+                            v!
+                                ? selected.add(room.id)
+                                : selected.remove(room.id);
+                            result.clear();
+                          }),
+                  ),
+                ),
               ),
             if (result.phase == ResourcePhase.error) ...[
               const SizedBox(height: 16),
@@ -156,7 +170,23 @@ class _ComparisonTable extends StatelessWidget {
       175.0,
       230.0,
     );
+    final minPrice = rooms
+        .map((r) => r.price)
+        .reduce((a, b) => a < b ? a : b);
+    final maxArea = rooms
+        .map((r) => r.area)
+        .reduce((a, b) => a > b ? a : b);
     final specs = <(String, String Function(Room))>[
+      (
+        'Đánh giá tối ưu',
+        (r) => r.price == minPrice && r.area == maxArea
+            ? '★ Tối ưu giá & diện tích'
+            : r.price == minPrice
+            ? '★ Giá tốt nhất'
+            : r.area == maxArea
+            ? '★ Rộng nhất'
+            : 'Tiêu chuẩn',
+      ),
       ('Giá thuê', (r) => r.priceLabel),
       ('Khu vực', (r) => r.district),
       ('Diện tích', (r) => '${r.area} m²'),

@@ -612,6 +612,8 @@ void main() {
       for (final page in [
         AdminRoomsScreen(state: s),
         AdminDecisionScreen(state: s, kind: 'user', id: 'tenant-a'),
+        AdminPackagesScreen(state: s),
+        AdminDisputesScreen(state: s),
         LandlordTenantsScreen(state: s),
       ]) {
         expect(RoutePolicy.forPage(page).evaluate(s), AccessResult.denied);
@@ -627,6 +629,7 @@ void main() {
     'review',
     'swap',
     'tenants',
+    'owner-swaps',
     'owner-reviews',
     'qr',
     'admin',
@@ -634,6 +637,8 @@ void main() {
     'admin-users',
     'admin-reports',
     'admin-rooms',
+    'admin-packages',
+    'admin-disputes',
     'packages',
     'checkout',
     'support',
@@ -654,7 +659,12 @@ void main() {
         originalError?.call(details);
       };
       addTearDown(() => FlutterError.onError = originalError);
-      final owner = ['tenants', 'owner-reviews', 'qr'].contains(name);
+      final owner = [
+        'tenants',
+        'owner-swaps',
+        'owner-reviews',
+        'qr',
+      ].contains(name);
       final admin = name.startsWith('admin') || name == 'kyc-queue';
       final s = demo(
         admin
@@ -673,6 +683,7 @@ void main() {
         'review' => ReviewScreen(state: s, rentalId: 'lease-a1'),
         'swap' => SwapScreen(state: s),
         'tenants' => LandlordTenantsScreen(state: s),
+        'owner-swaps' => LandlordSwapsScreen(state: s),
         'owner-reviews' => LandlordReviewsScreen(state: s),
         'qr' => LandlordQRScreen(state: s),
         'admin' => AdminScreen(state: s),
@@ -680,6 +691,8 @@ void main() {
         'admin-users' => AdminUsersScreen(state: s),
         'admin-reports' => AdminReportsScreen(state: s),
         'admin-rooms' => AdminRoomsScreen(state: s),
+        'admin-packages' => AdminPackagesScreen(state: s),
+        'admin-disputes' => AdminDisputesScreen(state: s),
         'packages' => PackagesScreen(state: s),
         'checkout' => CheckoutScreen(state: s, plan: ServicePlan.catalog.first),
         'support' => SupportScreen(state: s),
@@ -778,6 +791,110 @@ void main() {
       expect(s.store.kyc.single.number, '012345678901');
       expect(find.text('Chờ duyệt'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+  test(
+    'Landlord and Admin extended workflows: room renew/boost, handover/terminate, review reply/dispute, user governance and service plan CRUD',
+    () async {
+      final s = demo(UserRole.landlord);
+      addTearDown(s.dispose);
+
+      // Landlord renews room and boosts room after purchasing Pro plan
+      await s.workflows.renewRoom('r1', days: 30);
+      expect(s.roomById('r1')!.expiresAt, isNotNull);
+      await expectLater(s.workflows.boostRoom('r1'), denied);
+
+      final order = await s.workflows.checkout(
+        ServicePlan.catalog.firstWhere((p) => p.id == 'owner-pro'),
+        false,
+        'MoMo',
+      );
+      await s.workflows.paymentResult(order.id, 'Thành công');
+      expect(s.store.profiles[s.userId]!.boosts, 5);
+      await s.workflows.boostRoom('r1');
+      expect(s.roomById('r1')!.isBoosted, isTrue);
+      expect(s.store.profiles[s.userId]!.boosts, 4);
+
+      // Landlord confirms handover for lease-a1, then tenant submits review with sub-ratings
+      await s.workflows.confirmHandover('lease-a1');
+      expect(s.rentalById('lease-a1')!.checkedIn, isTrue);
+      expect(s.rentalById('lease-a1')!.handoverConfirmed, isTrue);
+
+      s.session.startDemo(UserRole.tenant);
+      final rev = await s.workflows.review(
+        'lease-a1',
+        2,
+        'Phòng hơi ồn vào buổi tối',
+        ['Đúng mô tả'],
+        cleanlinessRating: 4,
+        accuracyRating: 5,
+        communicationRating: 3,
+      );
+      expect(rev.cleanlinessRating, 4);
+      expect(rev.accuracyRating, 5);
+      expect(rev.communicationRating, 3);
+
+      // Landlord replies and disputes the review
+      s.session.startDemo(UserRole.landlord);
+      await s.workflows.replyReview(
+        rev.id,
+        'Cảm ơn bạn góp ý, mình đã nhắc nhở tầng trên giữ trật tự.',
+      );
+      expect(rev.landlordReply, contains('Cảm ơn bạn góp ý'));
+      await s.workflows.disputeReview(
+        rev.id,
+        'Đánh giá chưa phản ánh đúng vì công trình bên cạnh chỉ sửa 1 buổi.',
+      );
+      expect(rev.disputeStatus, 'Chờ xử lý');
+
+      // Landlord terminates lease-a2
+      await s.workflows.terminateRental('lease-a2', 'Khách chuyển công tác');
+      expect(s.rentalById('lease-a2')!.status, RentalStatus.terminated);
+      expect(s.rentalById('lease-a2')!.terminationReason, 'Khách chuyển công tác');
+
+      // Admin resolves dispute, governs user, and manages service plans
+      s.session.startDemo(UserRole.admin);
+      await s.workflows.resolveDispute(
+        rev.id,
+        false,
+        'Đánh giá hợp lệ từ người thuê thực tế.',
+      );
+      expect(rev.disputeStatus, 'Đã bác bỏ');
+
+      await s.workflows.warnUser('tenant-a', 'Chú ý ngôn từ khi đánh giá');
+      expect(s.store.profiles['tenant-a']!.warned, isTrue);
+      await s.workflows.toggleUserVerification(
+        'tenant-a',
+        true,
+        'Xác minh trực tiếp',
+      );
+      expect(s.store.workspaceById('tenant-a').verification, 'Đã xác minh');
+      await s.workflows.adminResetPassword('tenant-a');
+      await s.workflows.notifyUser(
+        'tenant-a',
+        'Thông báo hệ thống',
+        'Tài khoản của bạn đã được cập nhật.',
+      );
+
+      final customPlan = const ServicePlan(
+        'owner-enterprise',
+        'Chủ trọ Enterprise',
+        899000,
+        'Gói doanh nghiệp chuỗi nhà trọ',
+        yearly: 8990000,
+        boosts: 30,
+        landlord: true,
+        features: ['Quản lý chuỗi tòa nhà', '30 lượt đẩy tin VIP'],
+      );
+      await s.workflows.adminSavePlan(customPlan);
+      expect(s.store.plans.any((p) => p.id == 'owner-enterprise'), isTrue);
+      await s.workflows.adminDeletePlan('owner-enterprise');
+      expect(s.store.plans.any((p) => p.id == 'owner-enterprise'), isFalse);
+
+      final fbCount = s.store.systemFeedbacks.length;
+      await s.workflows.deleteSystemFeedback(s.store.systemFeedbacks.first.id);
+      expect(s.store.systemFeedbacks.length, fbCount - 1);
+      expect(s.store.auditLogs.length, greaterThan(4));
     },
   );
 }

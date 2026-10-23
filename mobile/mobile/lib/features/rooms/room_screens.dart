@@ -20,7 +20,7 @@ import 'room_gallery.dart';
 import 'compare_screen.dart';
 
 double _feedPhotoAspectRatio(BuildContext context) =>
-    MediaQuery.sizeOf(context).height < 820 ? 1.85 : 1.65;
+    MediaQuery.sizeOf(context).height < 860 ? 2.2 : 1.9;
 
 class DiscoverScreen extends StatefulWidget {
   final AppState state;
@@ -153,260 +153,410 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final room = !person && index < rooms.length ? rooms[index] : null;
     final candidate = person && index < people.length ? people[index] : null;
 
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            key: PageStorageKey(person ? 'roommates' : 'discover'),
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            children: [
-              Header(
-                unreadNotifications: state.unreadNotifications,
-                onMap: () => openPage(context, MapScreen(state: state)),
-                onNotifications: () =>
-                    openPage(context, NotificationsScreen(state: state)),
-              ),
-              PageHeading(
-                person ? 'Vuốt để ghép bạn' : 'Khám phá phòng trọ',
-                person
-                    ? 'Tìm người bạn ở phù hợp với lối sống của bạn'
-                    : 'Vuốt để tìm phòng trọ phù hợp với bạn',
-              ),
-              Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final lockViewport = constraints.maxHeight >= 520 && textScale <= 1.25;
+        final photoHeight = (constraints.maxHeight - (person ? 368 : 362))
+            .clamp(120.0, 395.0);
+        final hasDeckActions =
+            (state.unlimitedSwipes || quota > 0) && index < count;
+        final listMinHeight = lockViewport
+            ? math.max(
+                0.0,
+                constraints.maxHeight - (hasDeckActions ? 74.0 : 12.0),
+              )
+            : 0.0;
+
+        return Column(
+          children: [
+            Expanded(
+              child: ListView(
+                key: PageStorageKey(person ? 'roommates' : 'discover'),
+                physics: lockViewport
+                    ? const NeverScrollableScrollPhysics()
+                    : const ClampingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
                 children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          Pill(
-                            person ? _budgetLabel : state.district,
-                            icon: person
-                                ? LucideIcons.graduationCap
-                                : LucideIcons.mapPin,
-                            dropdown: true,
-                            bg: Colors.white,
-                            onTap: () =>
-                                showRoomFilters(context, state, person: person),
-                          ),
-                          const SizedBox(width: 6),
-                          Pill(
-                            person
-                                ? (state.personDistrict == 'Quận 10'
-                                      ? 'Gần Bách Khoa'
-                                      : state.personDistrict)
-                                : _budgetLabel,
-                            dropdown: true,
-                            bg: Colors.white,
-                            onTap: () =>
-                                showRoomFilters(context, state, person: person),
-                          ),
-                          const SizedBox(width: 6),
-                          Pill(
-                            person ? state.gender : state.type,
-                            dropdown: true,
-                            bg: Colors.white,
-                            onTap: () =>
-                                showRoomFilters(context, state, person: person),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  RoundButton(
-                    icon: LucideIcons.slidersHorizontal,
-                    label: 'Bộ lọc',
-                    size: 30,
-                    background: Colors.white,
-                    onTap: () =>
-                        showRoomFilters(context, state, person: person),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Material(
-                color: PT.mint,
-                borderRadius: BorderRadius.circular(14),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => openPage(context, PackagesScreen()),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    child: Row(
+                  ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: listMinHeight),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: state.unlimitedSwipes ? '' : 'Còn ',
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Header(
+                              unreadNotifications: state.unreadNotifications,
+                              onMap: () =>
+                                  openPage(context, MapScreen(state: state)),
+                              onNotifications: () => openPage(
+                                context,
+                                NotificationsScreen(state: state),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      children: [
+                                        Pill(
+                                          person
+                                              ? _budgetLabel
+                                              : state.district,
+                                          icon: person
+                                              ? LucideIcons.wallet
+                                              : LucideIcons.mapPin,
+                                          dropdown: true,
+                                          dense: true,
+                                          bg: Colors.white,
+                                          onTap: () => showRoomFilters(
+                                            context,
+                                            state,
+                                            person: person,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Pill(
+                                          person
+                                              ? (state.personDistrict ==
+                                                        'Quận 10'
+                                                    ? 'Gần Bách Khoa'
+                                                    : state.personDistrict)
+                                              : _budgetLabel,
+                                          icon: person
+                                              ? LucideIcons.graduationCap
+                                              : LucideIcons.wallet,
+                                          dropdown: true,
+                                          dense: true,
+                                          bg: Colors.white,
+                                          onTap: () => showRoomFilters(
+                                            context,
+                                            state,
+                                            person: person,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Pill(
+                                          person ? state.gender : state.type,
+                                          icon: person
+                                              ? LucideIcons.users
+                                              : LucideIcons.house,
+                                          dropdown: true,
+                                          dense: true,
+                                          bg: Colors.white,
+                                          onTap: () => showRoomFilters(
+                                            context,
+                                            state,
+                                            person: person,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    TextSpan(
-                                      text: state.unlimitedSwipes
-                                          ? 'Không giới hạn'
-                                          : '$quota/$allowance',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                RoundButton(
+                                  icon: LucideIcons.slidersHorizontal,
+                                  label: 'Bộ lọc',
+                                  size: 34,
+                                  background: Colors.white,
+                                  onTap: () => showRoomFilters(
+                                    context,
+                                    state,
+                                    person: person,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Material(
+                                    color: const Color(0xFFF1F8F5),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(12),
+                                      onTap: () =>
+                                          openPage(context, PackagesScreen()),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 11,
+                                          vertical: 7,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text.rich(
+                                                    TextSpan(
+                                                      children: [
+                                                        TextSpan(
+                                                          text:
+                                                              state.unlimitedSwipes
+                                                              ? ''
+                                                              : 'Còn ',
+                                                        ),
+                                                        TextSpan(
+                                                          text:
+                                                              state.unlimitedSwipes
+                                                              ? 'Không giới hạn'
+                                                              : '$quota/$allowance',
+                                                          style:
+                                                              const TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                              ),
+                                                        ),
+                                                        TextSpan(
+                                                          text: person
+                                                              ? ' lượt ghép hôm nay'
+                                                              : ' lượt vuốt hôm nay',
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: PT.body(
+                                                      11.5,
+                                                      PT.deep,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 3.5),
+                                                  ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
+                                                        ),
+                                                    child:
+                                                        TweenAnimationBuilder<
+                                                          double
+                                                        >(
+                                                          tween: Tween<double>(
+                                                            end:
+                                                                state
+                                                                    .unlimitedSwipes
+                                                                ? 1.0
+                                                                : (quota /
+                                                                          allowance)
+                                                                      .clamp(
+                                                                        0.0,
+                                                                        1.0,
+                                                                      ),
+                                                          ),
+                                                          duration:
+                                                              MediaQuery.disableAnimationsOf(
+                                                                context,
+                                                              )
+                                                              ? Duration.zero
+                                                              : const Duration(
+                                                                  milliseconds:
+                                                                      280,
+                                                                ),
+                                                          curve: Curves
+                                                              .easeOutCubic,
+                                                          builder:
+                                                              (
+                                                                context,
+                                                                val,
+                                                                _,
+                                                              ) =>
+                                                                  LinearProgressIndicator(
+                                                                    value: val,
+                                                                    minHeight:
+                                                                        3,
+                                                                    backgroundColor:
+                                                                        PT.sage,
+                                                                    color: PT
+                                                                        .green,
+                                                                  ),
+                                                        ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            const ExcludeSemantics(
+                                              child: Icon(
+                                                LucideIcons.chevronRight,
+                                                size: 14,
+                                                color: PT.green,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                    TextSpan(
-                                      text: person
-                                          ? ' lượt ghép hôm nay'
-                                          : ' lượt vuốt hôm nay',
+                                  ),
+                                ),
+                                if (!person && textScale <= 1.25) ...[
+                                  const SizedBox(width: 6),
+                                  Pill(
+                                    'Đã lưu',
+                                    icon: LucideIcons.bookmark,
+                                    dense: true,
+                                    bg: Colors.white,
+                                    onTap: () => openPage(
+                                      context,
+                                      SavedRoomsScreen(state: state),
                                     ),
-                                  ],
-                                ),
-                                style: PT.body(13),
-                              ),
-                              const SizedBox(height: 7),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: LinearProgressIndicator(
-                                  value: state.unlimitedSwipes
-                                      ? 1
-                                      : (quota / allowance).clamp(0, 1),
-                                  minHeight: 4,
-                                  backgroundColor: PT.sage,
-                                  color: PT.green,
-                                ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Pill(
+                                    'So sánh',
+                                    icon: LucideIcons.columns2,
+                                    dense: true,
+                                    bg: Colors.white,
+                                    onTap: () => openPage(
+                                      context,
+                                      CompareRoomsScreen(state: state),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (!person && textScale > 1.25) ...[
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  Pill(
+                                    'Đã lưu',
+                                    icon: LucideIcons.bookmark,
+                                    dense: true,
+                                    bg: Colors.white,
+                                    onTap: () => openPage(
+                                      context,
+                                      SavedRoomsScreen(state: state),
+                                    ),
+                                  ),
+                                  Pill(
+                                    'So sánh',
+                                    icon: LucideIcons.columns2,
+                                    dense: true,
+                                    bg: Colors.white,
+                                    onTap: () => openPage(
+                                      context,
+                                      CompareRoomsScreen(state: state),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        const ExcludeSemantics(
-                          child: Icon(
-                            LucideIcons.chevronRight,
-                            size: 20,
-                            color: PT.green,
+                        const SizedBox(height: 6),
+                        if (quota <= 0 && !state.unlimitedSwipes)
+                          EmptyState(
+                            'Hết lượt hôm nay',
+                            'Bạn có thể quay lại ngày mai hoặc xem các gói bổ sung.',
+                            action: PrimaryButton(
+                              'Xem gói dịch vụ',
+                              onTap: () => openPage(context, PackagesScreen()),
+                            ),
+                          )
+                        else if (index >= count)
+                          EmptyState(
+                            count == 0
+                                ? 'Không có kết quả phù hợp'
+                                : 'Đã xem hết gợi ý',
+                            count == 0
+                                ? 'Thử mở rộng ngân sách hoặc thay đổi tiện ích, khu vực.'
+                                : 'Thay đổi bộ lọc hoặc xem lại các gợi ý đã bỏ qua.',
+                            action: PrimaryButton(
+                              count == 0 ? 'Thay đổi bộ lọc' : 'Xem lại gợi ý',
+                              onTap: count == 0
+                                  ? () => showRoomFilters(
+                                      context,
+                                      state,
+                                      person: person,
+                                    )
+                                  : () => state.resetDeck(person),
+                            ),
+                          )
+                        else
+                          SwipeCard(
+                            key: _deck,
+                            identity: _identity,
+                            positiveLabel: person ? 'THÍCH' : 'LƯU',
+                            onSwipeRequested: _requestSwipe,
+                            next: index + 1 >= count
+                                ? null
+                                : person
+                                ? PersonCard(
+                                    person: people[index + 1],
+                                    photoHeight: photoHeight,
+                                    onInfo: () {},
+                                    onLike: () {},
+                                  )
+                                : RoomCard(
+                                    room: rooms[index + 1],
+                                    saved: state.isSaved(rooms[index + 1].id),
+                                    photoHeight: photoHeight,
+                                    onInfo: () {},
+                                    onSave: () {},
+                                  ),
+                            child: person
+                                ? PersonCard(
+                                    person: candidate!,
+                                    photoHeight: photoHeight,
+                                    onInfo: () => openPage(
+                                      context,
+                                      PersonDetailScreen(
+                                        state: state,
+                                        person: candidate,
+                                      ),
+                                    ),
+                                    onLike: () => _requestSwipe(true),
+                                  )
+                                : RoomCard(
+                                    room: room!,
+                                    saved: state.isSaved(room.id),
+                                    photoHeight: photoHeight,
+                                    onSave: () => withSession(
+                                      context,
+                                      () => state.toggleSave(room.id),
+                                    ),
+                                    onInfo: () => openPage(
+                                      context,
+                                      RoomDetailScreen(
+                                        state: state,
+                                        room: room,
+                                      ),
+                                    ),
+                                  ),
                           ),
-                        ),
+                        const SizedBox(height: 2),
                       ],
                     ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(height: 16),
-              if (quota <= 0 && !state.unlimitedSwipes)
-                EmptyState(
-                  'Hết lượt hôm nay',
-                  'Bạn có thể quay lại ngày mai hoặc xem các gói bổ sung.',
-                  action: PrimaryButton(
-                    'Xem gói dịch vụ',
-                    onTap: () => openPage(context, PackagesScreen()),
-                  ),
-                )
-              else if (index >= count)
-                EmptyState(
-                  count == 0 ? 'Không có kết quả phù hợp' : 'Đã xem hết gợi ý',
-                  count == 0
-                      ? 'Thử mở rộng ngân sách hoặc thay đổi tiện ích, khu vực.'
-                      : 'Thay đổi bộ lọc hoặc xem lại các gợi ý đã bỏ qua.',
-                  action: PrimaryButton(
-                    count == 0 ? 'Thay đổi bộ lọc' : 'Xem lại gợi ý',
-                    onTap: count == 0
-                        ? () => showRoomFilters(context, state, person: person)
-                        : () => state.resetDeck(person),
-                  ),
-                )
-              else ...[
-                SwipeCard(
-                  key: _deck,
-                  identity: _identity,
-                  positiveLabel: person ? 'THÍCH' : 'LƯU',
-                  onSwipeRequested: _requestSwipe,
-                  next: index + 1 >= count
-                      ? null
-                      : person
-                      ? PersonCard(
-                          person: people[index + 1],
-                          onInfo: () {},
-                          onLike: () {},
-                        )
-                      : RoomCard(
-                          room: rooms[index + 1],
-                          saved: state.isSaved(rooms[index + 1].id),
-                          onInfo: () {},
-                          onSave: () {},
-                        ),
-                  child: person
-                      ? PersonCard(
-                          person: candidate!,
-                          onInfo: () => openPage(
-                            context,
-                            PersonDetailScreen(state: state, person: candidate),
-                          ),
-                          onLike: () => _requestSwipe(true),
-                        )
-                      : RoomCard(
-                          room: room!,
-                          saved: state.isSaved(room.id),
-                          onSave: () => withSession(
-                            context,
-                            () => state.toggleSave(room.id),
-                          ),
-                          onInfo: () => openPage(
-                            context,
-                            RoomDetailScreen(state: state, room: room),
-                          ),
-                        ),
-                ),
-              ],
-              if (!person)
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton.icon(
-                        onPressed: () =>
-                            openPage(context, SavedRoomsScreen(state: state)),
-                        icon: const Icon(LucideIcons.bookmark, size: 18),
-                        label: const Text('Đã lưu'),
-                      ),
-                    ),
-                    Expanded(
-                      child: TextButton.icon(
-                        onPressed: () =>
-                            openPage(context, CompareRoomsScreen(state: state)),
-                        icon: const Icon(LucideIcons.columns2, size: 18),
-                        label: const Text('So sánh'),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-        if ((state.unlimitedSwipes || quota > 0) && index < count)
-          Padding(
-            key: _actions,
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  person
-                      ? 'Vuốt phải để thích, vuốt trái để bỏ qua'
-                      : 'Vuốt phải để lưu, vuốt trái để bỏ qua',
-                  style: PT.body(11, PT.muted),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Row(
+            ),
+            if (hasDeckActions)
+              Padding(
+                key: _actions,
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 6),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     RoundButton(
                       icon: LucideIcons.undo2,
                       label: 'Hoàn tác',
-                      size: 48,
+                      size: 44,
                       color: PT.amber,
-                      background: const Color(0xFFFFF8ED),
+                      background: Colors.white,
                       onTap: _busy
                           ? null
                           : () =>
@@ -415,24 +565,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     RoundButton(
                       icon: LucideIcons.x,
                       label: 'Bỏ qua',
-                      size: 56,
+                      size: 52,
                       color: PT.red,
-                      background: const Color(0xFFFFF0F3),
+                      background: Colors.white,
                       onTap: _busy ? null : () => _requestSwipe(false),
                     ),
                     RoundButton(
                       icon: LucideIcons.heart,
                       label: person ? 'Thích bạn ở' : 'Lưu phòng',
-                      size: 60,
+                      size: 56,
                       color: PT.green,
-                      background: const Color(0xFFE8FCF5),
+                      background: const Color(0xFFECFDF5),
                       onTap: _busy ? null : () => _requestSwipe(true),
                     ),
                     RoundButton(
                       icon: LucideIcons.info,
                       label: 'Xem chi tiết',
-                      size: 48,
-                      color: PT.muted,
+                      size: 44,
+                      color: PT.deep,
+                      background: Colors.white,
                       onTap: _busy
                           ? null
                           : () => openPage(
@@ -442,15 +593,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                       state: state,
                                       person: candidate!,
                                     )
-                                  : RoomDetailScreen(state: state, room: room!),
+                                  : RoomDetailScreen(
+                                      state: state,
+                                      room: room!,
+                                    ),
                             ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-      ],
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -458,17 +612,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 class RoomCard extends StatelessWidget {
   final Room room;
   final bool saved;
+  final double? photoHeight;
+  final bool showExtendedInfo;
   final VoidCallback onSave, onInfo;
   const RoomCard({
     super.key,
     required this.room,
     required this.saved,
+    this.photoHeight,
+    this.showExtendedInfo = false,
     required this.onSave,
     required this.onInfo,
   });
   @override
   Widget build(BuildContext context) => Container(
-    decoration: PT.card(radius: 18),
+    decoration: PT.card(radius: 22),
     clipBehavior: Clip.antiAlias,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,35 +635,43 @@ class RoomCard extends StatelessWidget {
           children: [
             InkWell(
               onTap: onInfo,
-              child: AspectRatio(
-                aspectRatio: _feedPhotoAspectRatio(context),
-                child: LayoutBuilder(
-                  builder: (_, constraints) => RoomGallery(
-                    room: room,
-                    height: constraints.maxHeight,
-                    allowSwipe: false,
-                  ),
-                ),
-              ),
+              child: photoHeight != null
+                  ? RoomGallery(
+                      room: room,
+                      height: photoHeight!,
+                      allowSwipe: false,
+                    )
+                  : AspectRatio(
+                      aspectRatio: _feedPhotoAspectRatio(context),
+                      child: LayoutBuilder(
+                        builder: (_, constraints) => RoomGallery(
+                          room: room,
+                          height: constraints.maxHeight,
+                          allowSwipe: false,
+                        ),
+                      ),
+                    ),
             ),
             Positioned(
-              top: 11,
-              left: 11,
+              top: 12,
+              left: 12,
               child: Pill(
                 'Match ${room.match}%',
                 icon: LucideIcons.heart,
                 color: PT.green,
-                bg: const Color(0xFFF0FFF9),
+                bg: Colors.white.withValues(alpha: .94),
+                dense: true,
               ),
             ),
             Positioned(
-              top: 8,
-              right: 8,
+              top: 10,
+              right: 10,
               child: RoundButton(
                 icon: saved ? LucideIcons.heartHandshake : LucideIcons.heart,
                 label: saved ? 'Bỏ lưu phòng' : 'Yêu thích',
+                size: 36,
                 onTap: onSave,
-                background: Colors.white,
+                background: Colors.white.withValues(alpha: .94),
               ),
             ),
           ],
@@ -513,33 +679,71 @@ class RoomCard extends StatelessWidget {
         InkWell(
           onTap: onInfo,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(15, 11, 15, 13),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Pill(room.type, color: PT.green, dense: true),
-                const SizedBox(height: 8),
-                Text(room.title, style: PT.title(20)),
-                const SizedBox(height: 8),
-                _Location(room.district),
-                const SizedBox(height: 10),
-                Text(room.priceLabel, style: PT.price(24)),
-                const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(LucideIcons.house, size: 18, color: PT.green),
-                    const SizedBox(width: 8),
-                    Text('${room.area} m²', style: PT.body(12, PT.muted)),
-                    const SizedBox(width: 20),
-                    const Icon(LucideIcons.blocks, size: 18, color: PT.green),
-                    const SizedBox(width: 8),
-                    Text('Tầng ${room.floor}', style: PT.body(12, PT.muted)),
+                    Text(
+                      room.type,
+                      style: PT
+                          .body(12, PT.green)
+                          .copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    Text('  •  ', style: PT.body(12, PT.line)),
+                    Expanded(
+                      child: Text(
+                        '${room.area} m² • Tầng ${room.floor}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: PT.body(12, PT.muted),
+                      ),
+                    ),
+                    const Icon(
+                      LucideIcons.shieldCheck,
+                      size: 13.5,
+                      color: PT.green,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        'Chủ trọ xác thực',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: PT
+                            .body(11.5, PT.green)
+                            .copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 5),
+                Text(
+                  room.title,
+                  style: PT.title(18.5),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(child: _Location(room.district)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        room.priceLabel,
+                        style: PT.price(17.5),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 9),
                 Wrap(
-                  spacing: 7,
-                  runSpacing: 6,
+                  spacing: 6,
+                  runSpacing: 5,
                   children: room.amenities
                       .take(3)
                       .map(
@@ -547,7 +751,7 @@ class RoomCard extends StatelessWidget {
                           a,
                           icon: amenityIcon(a),
                           dense: true,
-                          bg: const Color(0xFFF0F6F5),
+                          bg: const Color(0xFFF3F7F5),
                         ),
                       )
                       .toList(),
@@ -563,16 +767,20 @@ class RoomCard extends StatelessWidget {
 
 class PersonCard extends StatelessWidget {
   final Person person;
+  final double? photoHeight;
+  final bool showExtendedInfo;
   final VoidCallback onLike, onInfo;
   const PersonCard({
     super.key,
     required this.person,
+    this.photoHeight,
+    this.showExtendedInfo = false,
     required this.onLike,
     required this.onInfo,
   });
   @override
   Widget build(BuildContext context) => Container(
-    decoration: PT.card(radius: 18),
+    decoration: PT.card(radius: 22),
     clipBehavior: Clip.antiAlias,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -581,59 +789,123 @@ class PersonCard extends StatelessWidget {
           children: [
             InkWell(
               onTap: onInfo,
-              child: AspectRatio(
-                aspectRatio: _feedPhotoAspectRatio(context),
-                child: ReferencePhoto(kind: person.photo),
-              ),
+              child: photoHeight != null
+                  ? SizedBox(
+                      height: photoHeight,
+                      width: double.infinity,
+                      child: ReferencePhoto(kind: person.photo),
+                    )
+                  : AspectRatio(
+                      aspectRatio: _feedPhotoAspectRatio(context),
+                      child: ReferencePhoto(kind: person.photo),
+                    ),
             ),
             Positioned(
-              top: 11,
-              left: 11,
+              top: 12,
+              left: 12,
               child: Pill(
                 'Match ${person.match}%',
                 icon: LucideIcons.heart,
                 color: PT.green,
+                bg: Colors.white.withValues(alpha: .94),
+                dense: true,
               ),
             ),
             Positioned(
-              top: 8,
-              right: 8,
+              top: 10,
+              right: 10,
               child: RoundButton(
                 icon: LucideIcons.heart,
                 label: 'Thích hồ sơ',
+                size: 36,
                 onTap: onLike,
-                background: Colors.white,
+                background: Colors.white.withValues(alpha: .94),
               ),
             ),
-            const Positioned(bottom: 9, right: 9, child: _Counter('1/1')),
+            const Positioned(bottom: 10, right: 10, child: _Counter('1/1')),
           ],
         ),
         InkWell(
           onTap: onInfo,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(15, 11, 15, 13),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${person.name}, ${person.age}', style: PT.title(21)),
-                const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(LucideIcons.graduationCap, size: 18),
-                    const SizedBox(width: 8),
+                    const Icon(
+                      LucideIcons.shieldCheck,
+                      size: 13.5,
+                      color: PT.green,
+                    ),
+                    const SizedBox(width: 4),
                     Expanded(
-                      child: Text(person.school, style: PT.body(12, PT.muted)),
+                      child: Text(
+                        'Đã xác thực CCCD',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: PT
+                            .body(11.5, PT.green)
+                            .copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '≤ ${(person.budget / 1e6).toStringAsFixed(1)}tr/tháng',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: PT
+                            .body(12, PT.deep)
+                            .copyWith(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text('“${person.bio}”', style: PT.body(14, PT.muted)),
-                const SizedBox(height: 12),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${person.name}, ${person.age}',
+                        style: PT.title(18.5),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        person.school,
+                        style: PT.body(12, PT.muted),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '“${person.bio}”',
+                  style: PT.body(12.5, PT.muted),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 9),
                 Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
+                  spacing: 6,
+                  runSpacing: 5,
                   children: person.interests
-                      .map((i) => Pill(i, icon: amenityIcon(i)))
+                      .take(3)
+                      .map(
+                        (i) => Pill(
+                          i,
+                          icon: amenityIcon(i),
+                          dense: true,
+                          bg: const Color(0xFFF3F7F5),
+                        ),
+                      )
                       .toList(),
                 ),
               ],
@@ -650,12 +922,15 @@ class _Counter extends StatelessWidget {
   const _Counter(this.text);
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
     decoration: BoxDecoration(
       color: Colors.black.withValues(alpha: .58),
       borderRadius: BorderRadius.circular(20),
     ),
-    child: Text(text, style: PT.body(12, Colors.white)),
+    child: Text(
+      text,
+      style: PT.body(11, Colors.white).copyWith(fontWeight: FontWeight.w600),
+    ),
   );
 }
 
@@ -665,9 +940,16 @@ class _Location extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      const Icon(LucideIcons.mapPin, size: 18),
-      const SizedBox(width: 5),
-      Expanded(child: Text('$district, TP.HCM', style: PT.body(13, PT.muted))),
+      const Icon(LucideIcons.mapPin, size: 15, color: PT.green),
+      const SizedBox(width: 4),
+      Expanded(
+        child: Text(
+          '$district, TP.HCM',
+          style: PT.body(12.5, PT.muted).copyWith(fontWeight: FontWeight.w500),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
     ],
   );
 }
@@ -770,9 +1052,10 @@ void showRoomFilters(
                     (person
                             ? [
                                 'Tất cả',
-                                'Gọn gàng',
                                 'Không hút thuốc',
-                                'Ngủ sớm',
+                                'Ngủ trước 23h',
+                                'Gọn gàng, sạch sẽ',
+                                'Cho bạn bè tới chơi',
                               ]
                             : ['Tất cả', 'Studio', 'Phòng trọ', 'Căn hộ mini'])
                         .map(
@@ -832,6 +1115,8 @@ class RoomDetailScreen extends StatefulWidget implements ResourceScreen {
 
 class _RoomDetailScreenState extends State<RoomDetailScreen> {
   int tab = 0;
+  late Room currentRoom = widget.room;
+
   @override
   void initState() {
     super.initState();
@@ -841,23 +1126,43 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           .viewed
           .add(widget.room.id);
     }
+    _loadFullRoom();
+  }
+
+  Future<void> _loadFullRoom() async {
+    try {
+      final detail =
+          await widget.state.roomController.repository.find(widget.room.id);
+      if (detail != null && mounted) {
+        setState(() {
+          currentRoom = detail;
+        });
+        widget.state.cacheRoom(detail);
+      }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.room;
+    final r = currentRoom;
     return ListenableBuilder(
       listenable: widget.state,
       builder: (context, _) => Scaffold(
         body: SafeArea(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              Stack(
+          child: LayoutBuilder(
+            builder: (context, viewport) {
+              final galleryHeight = (viewport.maxHeight - 435).clamp(
+                155.0,
+                390.0,
+              );
+              return ListView(
+                padding: EdgeInsets.zero,
                 children: [
-                  RoomGallery(room: r),
-                  Positioned(
-                    top: 14,
+                  Stack(
+                    children: [
+                      RoomGallery(room: r, height: galleryHeight),
+                      Positioned(
+                    top: 8,
                     left: 10,
                     child: RoundButton(
                       icon: LucideIcons.arrowLeft,
@@ -867,8 +1172,8 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                     ),
                   ),
                   Positioned(
-                    top: 14,
-                    right: 63,
+                    top: 8,
+                    right: 54,
                     child: RoundButton(
                       icon: LucideIcons.share2,
                       label: 'Chia sẻ phòng',
@@ -877,14 +1182,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                         showModalBottomSheet<void>(
                           context: context,
                           builder: (context) => Padding(
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(20),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text('Chia sẻ phòng', style: PT.title(24)),
-                                const SizedBox(height: 16),
+                                Text('Chia sẻ phòng', style: PT.title(21)),
+                                const SizedBox(height: 12),
                                 Text(r.title, style: PT.body()),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
                                 PrimaryButton(
                                   'Gửi trong tin nhắn',
                                   icon: LucideIcons.messageCircle,
@@ -912,8 +1217,8 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                     ),
                   ),
                   Positioned(
-                    top: 14,
-                    right: 13,
+                    top: 8,
+                    right: 10,
                     child: RoundButton(
                       icon: LucideIcons.heart,
                       label: 'Lưu hoặc bỏ lưu',
@@ -928,61 +1233,120 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                 ],
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Pill(r.type, color: PT.green, dense: true),
-                    const SizedBox(height: 9),
-                    Text(r.title, style: PT.title(28)),
-                    const SizedBox(height: 9),
-                    _Location(r.district),
-                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Pill(r.type, color: PT.green, dense: true),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ...List.generate(
+                              5,
+                              (i) => Icon(
+                                i <
+                                        (double.tryParse(
+                                              widget.state.roomRating(r.id),
+                                            ) ??
+                                            0)
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                size: 14,
+                                color: PT.green,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.state.roomRating(r.id),
+                              style: PT.body(11),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              '(${widget.state.store.reviewRecords.where((v) => v.targetType == 'ROOM' && v.targetId == r.id).length} đánh giá)',
+                              style: PT.body(11, PT.muted),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      r.title,
+                      style: PT.title(18),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
                     Row(
                       children: [
-                        ...List.generate(
-                          5,
-                          (i) => Icon(
-                            i <
-                                    (double.tryParse(
-                                          widget.state.roomRating(r.id),
-                                        ) ??
-                                        0)
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            size: 17,
-                            color: PT.green,
-                          ),
-                        ),
+                        Expanded(child: _Location(r.district)),
                         const SizedBox(width: 8),
-                        Text(widget.state.roomRating(r.id), style: PT.body(13)),
                         Flexible(
-                          child: Text(
-                            '(${widget.state.store.reviewRecords.where((v) => v.targetType == 'ROOM' && v.targetId == r.id).length} đánh giá)',
-                            style: PT.body(12, PT.muted),
+                          child: Text(r.priceLabel, style: PT.price(18)),
+                        ),
+                      ],
+                    ),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 0,
+                      alignment: WrapAlignment.spaceBetween,
+                      children: [
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 2,
+                              vertical: 0,
+                            ),
+                          ),
+                          onPressed: () => openPage(
+                            context,
+                            CompareRoomsScreen(
+                              state: widget.state,
+                              initialRoomId: r.id,
+                            ),
+                          ),
+                          icon: const Icon(LucideIcons.columns2, size: 14),
+                          label: const Text('So sánh phòng này'),
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 2,
+                              vertical: 0,
+                            ),
+                          ),
+                          icon: const Icon(LucideIcons.flag, size: 14),
+                          label: const Text('Báo cáo tin phòng'),
+                          onPressed: () => withSession(
+                            context,
+                            () => openPage(
+                              context,
+                              ReportScreen(
+                                state: widget.state,
+                                targetType: 'ROOM',
+                                targetId: r.id,
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 9),
-                    Text(r.priceLabel, style: PT.price(26)),
-                    TextButton.icon(
-                      onPressed: () => openPage(
-                        context,
-                        CompareRoomsScreen(
-                          state: widget.state,
-                          initialRoomId: r.id,
-                        ),
-                      ),
-                      icon: const Icon(LucideIcons.columns2, size: 18),
-                      label: const Text('So sánh phòng này'),
-                    ),
-                    const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: PT.mint,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         children: [
@@ -1010,17 +1374,17 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 6),
                     Wrap(
-                      spacing: 7,
-                      runSpacing: 8,
+                      spacing: 5,
+                      runSpacing: 4,
                       children: r.amenities
                           .map(
                             (a) => Pill(a, icon: amenityIcon(a), dense: true),
                           )
                           .toList(),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 6),
                     Row(
                       children: List.generate(
                         4,
@@ -1032,13 +1396,13 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                               selected: tab == i,
                               child: ConstrainedBox(
                                 constraints: const BoxConstraints(
-                                  minHeight: 48,
+                                  minHeight: 34,
                                 ),
                                 child: Column(
                                   children: [
                                     Padding(
                                       padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
+                                        vertical: 6,
                                       ),
                                       child: Text(
                                         [
@@ -1060,7 +1424,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                       ),
                                     ),
                                     Container(
-                                      height: 2.5,
+                                      height: 2,
                                       color: tab == i ? PT.green : PT.line,
                                     ),
                                   ],
@@ -1071,29 +1435,81 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 17),
+                    const SizedBox(height: 8),
                     if (tab == 0) ...[
-                      Text('Mô tả', style: PT.title(22)),
-                      const SizedBox(height: 8),
-                      Text(r.description, style: PT.body(13, PT.muted)),
-                      const SizedBox(height: 12),
+                      Text('Mô tả', style: PT.title(15)),
+                      const SizedBox(height: 3),
+                      Text(
+                        r.description,
+                        style: PT.body(12, PT.muted),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: PT.mint,
-                          borderRadius: BorderRadius.circular(13),
-                        ),
-                        child: Text(
-                          '“Một không gian nhỏ nhưng đầy đủ tiện nghi, để bạn cảm thấy như ở nhà.”',
-                          style: PT
-                              .body(13)
-                              .copyWith(fontStyle: FontStyle.italic),
+                        padding: const EdgeInsets.all(8),
+                        decoration: PT.card(radius: 11),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                AvatarPhoto(
+                                  size: 38,
+                                  online: true,
+                                  name: r.landlordName.isNotEmpty
+                                      ? r.landlordName
+                                      : 'Chủ trọ',
+                                  imageUrl: r.landlordAvatarUrl,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        r.landlordName.isNotEmpty
+                                            ? r.landlordName
+                                            : 'Chủ trọ đối tác Phòng Trọ Xanh',
+                                        style: PT.title(13),
+                                      ),
+                                      Text(
+                                        'Phản hồi 98% • Thường trả lời < 15 phút',
+                                        style: PT.body(10, PT.muted),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            const Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                Pill(
+                                  'Đã xác thực CCCD',
+                                  icon: LucideIcons.shieldCheck,
+                                  color: PT.green,
+                                  dense: true,
+                                ),
+                                Pill(
+                                  'Nhận phòng QR minh bạch',
+                                  icon: LucideIcons.qrCode,
+                                  color: Color(0xFF1D62E0),
+                                  bg: Color(0xFFEAF1FF),
+                                  dense: true,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
                     if (tab == 1) ...[
-                      Text('Giá & chi phí minh bạch', style: PT.title(22)),
-                      const SizedBox(height: 10),
+                      Text('Giá & chi phí minh bạch', style: PT.title(15)),
+                      const SizedBox(height: 4),
                       for (final fee in [
                         ('Tiền thuê', r.priceLabel),
                         ('Điện', r.electricity),
@@ -1101,43 +1517,93 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                         ('Phí khác', r.otherFees),
                       ])
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          padding: const EdgeInsets.symmetric(vertical: 3),
                           child: Row(
                             children: [
-                              Expanded(child: Text(fee.$1, style: PT.body())),
+                              Expanded(child: Text(fee.$1, style: PT.body(12))),
                               Expanded(
                                 child: Text(
                                   fee.$2,
                                   textAlign: TextAlign.right,
-                                  style: PT.body(14, PT.green),
+                                  style: PT.body(12, PT.green),
                                 ),
                               ),
                             ],
                           ),
                         ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: PT.card(color: PT.mint, radius: 11),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  LucideIcons.calculator,
+                                  size: 14,
+                                  color: PT.green,
+                                ),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: Text(
+                                    'Dự toán tổng chi phí hàng tháng',
+                                    style: PT.title(13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Tổng dự kiến / tháng',
+                                    style: PT
+                                        .body(12)
+                                        .copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                Text(
+                                  '~${((r.price + 450000) / 1e6).toStringAsFixed(2)} triệu/tháng',
+                                  style: PT.price(15),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              'Tiền cọc tiêu chuẩn (1 tháng): ${r.priceLabel}',
+                              style: PT.body(10, PT.muted),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                     if (tab == 2) ...[
-                      Text('Vị trí phòng', style: PT.title(22)),
-                      const SizedBox(height: 10),
-                      Text('${r.address}, ${r.district}, TP.HCM'),
-                      const SizedBox(height: 14),
+                      Text('Vị trí phòng', style: PT.title(15)),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${r.address}, ${r.district}, TP.HCM',
+                        style: PT.body(12, PT.muted),
+                      ),
+                      const SizedBox(height: 6),
                       SizedBox(
-                        height: 180,
+                        height: 85,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(10),
                           child: const CustomPaint(
                             painter: StreetPainter(),
                             child: Center(
                               child: Icon(
                                 LucideIcons.mapPin,
-                                size: 42,
+                                size: 28,
                                 color: PT.green,
                               ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 6),
                       PrimaryButton(
                         'Mở bản đồ',
                         icon: LucideIcons.map,
@@ -1146,12 +1612,12 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           MapScreen(state: widget.state, roomId: r.id),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 6),
                       DirectionsButton(room: r),
                     ],
                     if (tab == 3) ...[
-                      Text('Đánh giá từ người thuê', style: PT.title(22)),
-                      const SizedBox(height: 14),
+                      Text('Đánh giá từ người thuê', style: PT.title(15)),
+                      const SizedBox(height: 6),
                       if (!widget.state.store.reviewRecords.any(
                         (v) => v.targetType == 'ROOM' && v.targetId == r.id,
                       ))
@@ -1161,46 +1627,32 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                             (v) => v.targetType == 'ROOM' && v.targetId == r.id,
                           ))
                         Container(
-                          padding: const EdgeInsets.all(14),
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: PT.card(),
+                          padding: const EdgeInsets.all(9),
+                          margin: const EdgeInsets.only(bottom: 6),
+                          decoration: PT.card(radius: 11),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '${review.authorName} • ${review.rating}/5',
-                                style: PT.title(18),
+                                style: PT.title(14),
                               ),
-                              const SizedBox(height: 8),
-                              Text(review.comment),
-                              Text(review.tags.join(' • ')),
+                              const SizedBox(height: 3),
+                              Text(review.comment, style: PT.body(12)),
                               Text(
-                                'Hợp đồng: ${review.rentalId}',
-                                style: PT.body(12, PT.muted),
+                                '${review.tags.join(' • ')} • HĐ: ${review.rentalId}',
+                                style: PT.body(10, PT.muted),
                               ),
                             ],
                           ),
                         ),
                     ],
-                    TextButton.icon(
-                      icon: const Icon(LucideIcons.flag),
-                      label: const Text('Báo cáo tin phòng'),
-                      onPressed: () => withSession(
-                        context,
-                        () => openPage(
-                          context,
-                          ReportScreen(
-                            state: widget.state,
-                            targetType: 'ROOM',
-                            targetId: r.id,
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
             ],
+          );
+            },
           ),
         ),
         bottomNavigationBar: SafeArea(
@@ -1210,7 +1662,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
               color: Colors.white,
               border: Border(top: BorderSide(color: PT.line)),
             ),
-            padding: const EdgeInsets.fromLTRB(13, 9, 13, 10),
+            padding: const EdgeInsets.fromLTRB(13, 6, 13, 8),
             child: Row(
               children: [
                 Expanded(
@@ -1260,13 +1712,13 @@ class _Spec extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Icon(icon, size: 22, color: PT.green),
-      const SizedBox(width: 8),
+      Icon(icon, size: 18, color: PT.green),
+      const SizedBox(width: 6),
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: PT.body(12)),
+            Text(title, style: PT.body(11)),
             Text(subtitle, style: PT.body(10, PT.muted)),
           ],
         ),
@@ -1280,28 +1732,29 @@ class MenuReview extends StatelessWidget {
   const MenuReview({super.key, required this.name, required this.text});
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(14),
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.all(11),
     decoration: PT.card(),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const AvatarPhoto(size: 32),
-            const SizedBox(width: 10),
-            Text(name, style: PT.title(16)),
+            AvatarPhoto(size: 30, name: name),
+            const SizedBox(width: 8),
+            Text(name, style: PT.title(15)),
             const Spacer(),
             Text('★ 4.8', style: PT.body(12, PT.green)),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(text, style: PT.body(13, PT.muted)),
         const SizedBox(height: 6),
+        Text(text, style: PT.body(12, PT.muted)),
+        const SizedBox(height: 5),
         const Pill(
           'Đã xác nhận thuê',
           icon: LucideIcons.shieldCheck,
           color: PT.green,
+          dense: true,
         ),
       ],
     ),
@@ -1333,42 +1786,140 @@ class PersonDetailScreen extends StatelessWidget implements ResourceScreen {
       ),
     ),
     child: ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: ReferencePhoto(kind: person.photo, height: 260),
+          borderRadius: BorderRadius.circular(14),
+          child: ReferencePhoto(kind: person.photo, height: 155),
         ),
-        const SizedBox(height: 18),
-        Text('${person.name}, ${person.age}', style: PT.title(28)),
+        const SizedBox(height: 10),
+        Text('${person.name}, ${person.age}', style: PT.title(22)),
+        const SizedBox(height: 4),
+        Text(person.school, style: PT.body(13, PT.muted)),
         const SizedBox(height: 8),
-        Text(person.school, style: PT.body(15, PT.muted)),
-        const SizedBox(height: 12),
-        Pill(
-          'Tương thích ${person.match}%',
-          icon: LucideIcons.heart,
-          color: PT.green,
-        ),
-        const SizedBox(height: 18),
-        Text(person.bio, style: PT.body(15, PT.muted)),
-        const SizedBox(height: 20),
-        Text('Sở thích & lối sống', style: PT.title(22)),
-        const SizedBox(height: 12),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            Pill(
+              'Tương thích ${person.match}%',
+              icon: LucideIcons.heart,
+              color: PT.green,
+              dense: true,
+            ),
+            const Pill(
+              'Sinh viên đã xác thực',
+              icon: LucideIcons.shieldCheck,
+              color: Color(0xFF0E7A56),
+              bg: Color(0xFFE7F7F0),
+              dense: true,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(person.bio, style: PT.body(13, PT.muted)),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(11),
+          decoration: PT.card(color: const Color(0xFFF7FBF9)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    LucideIcons.sparkles,
+                    size: 16,
+                    color: PT.green,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Phân tích độ hợp lối sống',
+                      style: PT.title(16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              for (final metric in [
+                (
+                  'Giờ giấc sinh hoạt',
+                  '${(person.match + 2).clamp(75, 99)}%',
+                  ((person.match + 2).clamp(75, 99)) / 100.0,
+                ),
+                (
+                  'Mức độ ngăn nắp & vệ sinh',
+                  '${(person.match + 4).clamp(78, 99)}%',
+                  ((person.match + 4).clamp(78, 99)) / 100.0,
+                ),
+                (
+                  'Ngân sách thuê phòng',
+                  '${(person.match - 1).clamp(72, 98)}%',
+                  ((person.match - 1).clamp(72, 98)) / 100.0,
+                ),
+                (
+                  'Thói quen & sở thích chung',
+                  '${person.match}%',
+                  person.match / 100.0,
+                ),
+              ]) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 7),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(metric.$1, style: PT.body(12)),
+                          ),
+                          Text(
+                            metric.$2,
+                            style: PT
+                                .body(11, PT.green)
+                                .copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      RepaintBoundary(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(99),
+                          child: LinearProgressIndicator(
+                            value: metric.$3,
+                            minHeight: 5,
+                            backgroundColor: const Color(0xFFE3EFEA),
+                            color: PT.green,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text('Sở thích & lối sống', style: PT.title(18)),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
           children: [
             ...person.interests,
             ...person.habits,
-          ].map((s) => Pill(s)).toList(),
+          ].map((s) => Pill(s, dense: true)).toList(),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
         Text(
           'Ngân sách tối đa ${(person.budget / 1e6).toStringAsFixed(1)} triệu/tháng',
-          style: PT.body(16),
+          style: PT.body(13),
         ),
         TextButton.icon(
-          icon: const Icon(LucideIcons.flag),
+          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+          icon: const Icon(LucideIcons.flag, size: 16),
           label: const Text('Báo cáo hồ sơ'),
           onPressed: () => withSession(
             context,
