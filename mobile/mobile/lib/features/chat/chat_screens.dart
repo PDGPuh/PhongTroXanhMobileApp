@@ -58,7 +58,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         ),
                         ...widget.state.people.map(
                           (p) => ListTile(
-                            leading: AvatarPhoto(kind: p.photo, size: 38),
+                            leading: AvatarPhoto(
+                              kind: p.photo,
+                              size: 38,
+                              name: p.name,
+                            ),
                             title: Text(p.name),
                             onTap: () {
                               Navigator.pop(context);
@@ -144,6 +148,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         kind: c.photo,
                         size: 46,
                         online: c.photo != PhotoKind.room,
+                        name: c.name,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -312,6 +317,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     kind: widget.conversation.photo,
                     size: 38,
                     online: true,
+                    name: widget.conversation.participantName.isEmpty
+                        ? widget.conversation.name
+                        : widget.conversation.participantName,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -453,6 +461,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             AvatarPhoto(
                               kind: widget.conversation.photo,
                               size: 30,
+                              name: widget.conversation.participantName.isEmpty
+                                  ? widget.conversation.name
+                                  : widget.conversation.participantName,
                             ),
                             const SizedBox(width: 8),
                           ],

@@ -73,6 +73,8 @@ class Room {
   final int price, deposit, area, floor, match, contactCount;
   final List<String> amenities;
   final String landlordId, landlordName;
+  final String? landlordAvatarUrl;
+  final String? landlordPhone;
   final RoomStatus status;
   final List<PhotoKind> images;
   final List<LocalPhoto> localPhotos;
@@ -100,6 +102,8 @@ class Room {
     this.otherFees = 'Wifi, giữ xe miễn phí. Đặt cọc 1 tháng tiền phòng.',
     this.landlordId = 'owner-a',
     this.landlordName = 'Cô Hồng',
+    this.landlordAvatarUrl,
+    this.landlordPhone,
     this.status = RoomStatus.available,
     this.images = const [PhotoKind.room],
     this.localPhotos = const [],
@@ -121,6 +125,8 @@ class Room {
     RoomStatus? status,
     String? landlordId,
     String? landlordName,
+    String? landlordAvatarUrl,
+    String? landlordPhone,
     int? deposit,
     String? internetFee,
     String? parkingFee,
@@ -157,6 +163,8 @@ class Room {
     status: status ?? this.status,
     landlordId: landlordId ?? this.landlordId,
     landlordName: landlordName ?? this.landlordName,
+    landlordAvatarUrl: landlordAvatarUrl ?? this.landlordAvatarUrl,
+    landlordPhone: landlordPhone ?? this.landlordPhone,
   );
 }
 
@@ -217,7 +225,8 @@ class ChatMessage {
 }
 
 class Conversation {
-  final String id, name, time, subtitle;
+  String id;
+  final String name, time, subtitle;
   final String participantId, participantName;
   final String? roomId;
   final PhotoKind photo;

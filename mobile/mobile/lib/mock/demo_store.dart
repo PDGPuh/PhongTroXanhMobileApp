@@ -116,10 +116,12 @@ class UserWorkspace {
   int roomQuota = 7, roommateQuota = 6;
   int roomAllowance = 15, roommateAllowance = 10;
   Set<String> interests = {'Nấu ăn', 'Đọc sách', 'Du lịch'};
-  bool smoking = false, earlySleep = true, tidy = true;
+  bool smoking = false, earlySleep = true, tidy = true, allowGuests = false;
+  String? avatarUrl;
   UserWorkspace(SessionUser user)
     : fullName = user.name,
       email = user.email,
+      avatarUrl = user.avatarUrl,
       conversations = user.id == 'tenant-a'
           ? DemoRepository.conversations()
           : [] {

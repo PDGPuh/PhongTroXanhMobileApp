@@ -96,82 +96,100 @@ class ServicePlan {
     this.features = const [],
   });
   static const catalog = [
+    // --- Gói dành cho Người thuê (TENANT) ---
     ServicePlan(
-      'plus',
-      'Green Plus',
+      'FREE',
+      'Gói Miễn Phí',
+      0,
+      'Gói miễn phí cơ bản dành cho người tìm trọ và tìm bạn ở ghép',
+      yearly: 0,
+      extraSwipes: 15,
+      boosts: 0,
+      landlord: false,
+      features: [
+        '15 lượt quẹt tìm phòng & bạn ở mỗi ngày',
+        'Tìm kiếm và lọc phòng trọ cơ bản',
+        'Nhắn tin trao đổi khi có ghép đôi thành công',
+      ],
+    ),
+    ServicePlan(
+      'PRO_TENANT',
+      'Gói Pro Tìm Bạn & Thuê Phòng',
+      29000,
+      'Tăng lượt quẹt và ưu tiên hiển thị hồ sơ ghép bạn',
+      yearly: 290000,
+      extraSwipes: 50,
+      boosts: 2,
+      landlord: false,
+      features: [
+        '50 lượt quẹt khám phá mỗi ngày',
+        'Tặng 2 lượt đẩy hồ sơ (ưu tiên hiển thị 24 giờ/lượt)',
+        'Bộ lọc nâng cao theo lối sống, ngân sách & trường học',
+        'Ưu tiên ghép đôi siêu tốc',
+      ],
+    ),
+    ServicePlan(
+      'VIP_TENANT',
+      'Gói VIP Ghép Đôi Siêu Tốc',
+      59000,
+      'Đặc quyền tối đa cho người thuê: 100 lượt quẹt/ngày và 6 lượt đẩy hồ sơ',
+      yearly: 590000,
+      extraSwipes: 100,
+      boosts: 6,
+      landlord: false,
+      features: [
+        '100 lượt quẹt khám phá mỗi ngày',
+        'Tặng 6 lượt đẩy hồ sơ (ưu tiên hiển thị 24 giờ/lượt)',
+        'Xem ai đã thích hồ sơ của bạn',
+        'Huy hiệu thành viên VIP nổi bật',
+        'Hỗ trợ ưu tiên 24/7',
+      ],
+    ),
+
+    // --- Gói dành cho Chủ trọ (LANDLORD) ---
+    ServicePlan(
+      'LANDLORD_BASIC',
+      'Gói Đẩy Tin Trải Nghiệm',
       39000,
-      'Vuốt phòng và ghép bạn không giới hạn trong thời hạn gói',
+      'Dành cho chủ trọ mới tiếp cận khách thuê nhanh chóng',
+      yearly: 390000,
+      boosts: 3,
+      landlord: true,
       features: [
-        'Vuốt phòng & tìm bạn ở không giới hạn',
-        'Bộ lọc nâng cao theo lối sống',
-        'Ưu tiên hiển thị hồ sơ tìm bạn ở',
+        '3 lượt đẩy tin phòng lên đầu trang tìm kiếm (24 giờ/lượt)',
+        'Tiếp cận khách thuê tiềm năng nhanh gấp 2 lần',
+        'Hỗ trợ duyệt tin và hiển thị ngay lập tức',
       ],
     ),
     ServicePlan(
-      'gold',
-      'Green Gold',
+      'LANDLORD_VIP',
+      'Gói Chủ Trọ VIP',
       79000,
-      'Đặc quyền Plus; xem ai đã thích bạn; 1 Boost và 5 Super Match',
-      boosts: 1,
-      superMatches: 5,
+      'Tối ưu tỷ lệ lấp đầy phòng trọ với 8 lượt đẩy tin VIP',
+      yearly: 790000,
+      boosts: 8,
+      landlord: true,
       features: [
-        'Toàn bộ đặc quyền của gói Green Plus',
-        'Xem danh sách ai đã thích hồ sơ của bạn',
-        'Tặng 1 lượt Boost & 5 lượt Super Match',
+        '8 lượt đẩy tin phòng VIP đầu trang (24 giờ/lượt)',
+        'Huy hiệu Chủ trọ Uy tín VIP',
+        'Ưu tiên hiển thị trên bản đồ và danh sách gợi ý',
+        'Thống kê lượt xem và tương tác của khách thuê',
       ],
     ),
     ServicePlan(
-      'swipes',
-      '+150 lượt vuốt',
-      29000,
-      'Thêm 150 lượt khám phá',
-      extraSwipes: 150,
-      features: ['Cộng ngay 150 lượt vuốt phòng', 'Không giới hạn thời gian dùng'],
-    ),
-    ServicePlan(
-      'boost',
-      '1 lượt Boost hồ sơ',
-      19000,
-      'Đẩy hồ sơ trong bản demo',
-      boosts: 1,
-      features: ['Đẩy nổi bật hồ sơ / tin phòng trong 24 giờ'],
-    ),
-    ServicePlan(
-      'super',
-      '5 lượt Super Match',
-      29000,
-      '5 lượt ưu tiên ghép bạn',
-      superMatches: 5,
-      features: ['Gửi lời thích ưu tiên đến 5 bạn ở tiềm năng'],
-    ),
-    ServicePlan(
-      'owner-pro',
-      'Chủ trọ Pro',
-      199000,
-      'Gói chủ trọ theo web hiện tại',
-      yearly: 1908000,
-      boosts: 5,
+      'LANDLORD_PRO',
+      'Gói Chủ Trọ Chuyên Nghiệp',
+      149000,
+      'Giải pháp toàn diện cho chủ chuỗi nhà trọ & căn hộ dịch vụ',
+      yearly: 1490000,
+      boosts: 20,
       landlord: true,
       features: [
-        'Đăng tối đa 15 tin phòng cùng lúc',
-        'Tặng 5 lượt Đẩy tin nổi bật mỗi tháng',
-        'Báo cáo phân tích lượt xem & tỉ lệ lấp đầy',
-        'Huy hiệu Chủ trọ Uy tín Pro',
-      ],
-    ),
-    ServicePlan(
-      'owner-premium',
-      'Chủ trọ Premium',
-      499000,
-      'Gói chủ trọ Premium',
-      yearly: 4788000,
-      boosts: 15,
-      landlord: true,
-      features: [
-        'Đăng tin phòng không giới hạn',
-        'Tặng 15 lượt Đẩy tin VIP đầu trang',
-        'Ưu tiên duyệt tin nhanh & hỗ trợ 24/7',
-        'Phân tích chuyên sâu thị trường theo khu vực',
+        '20 lượt đẩy tin nổi bật VIP đầu trang',
+        'Đăng tin phòng trọ không giới hạn',
+        'Huy hiệu Đối tác Xác thực Chuyên nghiệp',
+        'Báo cáo phân tích nhu cầu thị trường khu vực',
+        'Quản lý hợp đồng & nhân khẩu trực tiếp',
       ],
     ),
   ];
@@ -189,6 +207,7 @@ class PaymentOrder {
 
 class PublicProfile {
   LocalPhoto? avatarPhoto;
+  String? avatarUrl;
   final SessionUser user;
   PhotoKind avatar = PhotoKind.man;
   String school = '', gender = 'Nữ', birthday = '', district = 'Quận 10';
@@ -199,7 +218,7 @@ class PublicProfile {
   int boosts = 0, superMatches = 0;
   DateTime? boostedAt;
   final Set<String> priorityPeople = {};
-  int trustScore = 85;
+  int trustScore = 50;
   bool warned = false;
   String warningNote = '';
   String address = '';

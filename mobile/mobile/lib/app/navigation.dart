@@ -62,10 +62,14 @@ class RoutePolicy {
   AccessResult evaluate(AppState state, {ResourceRef? target}) {
     if (!public && !state.authenticated) return AccessResult.loginRequired;
     if (role != null && state.role != role) return AccessResult.denied;
+    if (public && (target?.kind == ResourceKind.room || target?.kind == ResourceKind.person)) {
+      return AccessResult.allowed;
+    }
     if (target != null) {
       if (!state.resourceExists(target)) return AccessResult.missing;
       if (target.kind == ResourceKind.room) {
-        final room = state.roomById(target.id)!;
+        final room = state.roomById(target.id);
+        if (room == null) return AccessResult.missing;
         if (role == UserRole.landlord && room.landlordId != state.userId) {
           return AccessResult.denied;
         }

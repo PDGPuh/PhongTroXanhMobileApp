@@ -52,39 +52,15 @@ class _PackagesScreenState extends State<PackagesScreen> {
               value: yearly,
               onChanged: (v) => setState(() => yearly = v),
             ),
-          for (final plan in s.store.plans.where(
+          for (final plan in ServicePlan.catalog.where(
             (p) => p.landlord == (s.role == UserRole.landlord),
           ))
             flowCard(plan.name, [
               Text(
-                '${yearly ? plan.yearly : plan.monthly}đ${yearly ? '/năm' : (['plus', 'gold', 'owner-pro', 'owner-premium'].contains(plan.id) || plan.monthly >= 39000 && plan.extraSwipes == 0 ? '/tháng' : '')}',
+                '${yearly ? plan.yearly : plan.monthly}đ${yearly ? '/năm' : (['plus', 'gold', 'owner-pro', 'owner-premium'].contains(plan.id) ? '/tháng' : '')}',
                 style: PT.title(25).copyWith(color: PT.green),
               ),
               Text(plan.description),
-              if (plan.features.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                for (final feat in plan.features)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(top: 3),
-                          child: Icon(
-                            LucideIcons.check,
-                            size: 14,
-                            color: PT.green,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(feat, style: PT.body(13, PT.muted)),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
               const SizedBox(height: 16),
               PrimaryButton(
                 'Chọn ${plan.name}',

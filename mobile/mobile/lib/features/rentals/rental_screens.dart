@@ -42,7 +42,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
       error = null;
     });
     try {
-      final result = await widget.state.workflows.run(
+      final result = await await widget.state.workflows.run(
         'check-in',
         () => widget.state.checkIn(value, rentalId: selectedRentalId),
       );

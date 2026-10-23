@@ -145,7 +145,13 @@ class PublicProfileScreen extends StatelessWidget {
       final p = state.store.profiles[state.userId]!;
       return [
         flowCard(state.fullName, [
-          AvatarPhoto(kind: p.avatar, photo: p.avatarPhoto, size: 80),
+          AvatarPhoto(
+            kind: p.avatar,
+            photo: p.avatarPhoto,
+            imageUrl: p.avatarUrl ?? state.avatarUrl,
+            name: state.fullName,
+            size: 80,
+          ),
           const SizedBox(height: 12),
           Text(state.bio),
           Text('${p.gender} • ${p.district}'),

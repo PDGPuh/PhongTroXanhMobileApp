@@ -1052,9 +1052,10 @@ void showRoomFilters(
                     (person
                             ? [
                                 'Tất cả',
-                                'Gọn gàng',
                                 'Không hút thuốc',
-                                'Ngủ sớm',
+                                'Ngủ trước 23h',
+                                'Gọn gàng, sạch sẽ',
+                                'Cho bạn bè tới chơi',
                               ]
                             : ['Tất cả', 'Studio', 'Phòng trọ', 'Căn hộ mini'])
                         .map(
@@ -1114,6 +1115,8 @@ class RoomDetailScreen extends StatefulWidget implements ResourceScreen {
 
 class _RoomDetailScreenState extends State<RoomDetailScreen> {
   int tab = 0;
+  late Room currentRoom = widget.room;
+
   @override
   void initState() {
     super.initState();
@@ -1123,11 +1126,25 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           .viewed
           .add(widget.room.id);
     }
+    _loadFullRoom();
+  }
+
+  Future<void> _loadFullRoom() async {
+    try {
+      final detail =
+          await widget.state.roomController.repository.find(widget.room.id);
+      if (detail != null && mounted) {
+        setState(() {
+          currentRoom = detail;
+        });
+        widget.state.cacheRoom(detail);
+      }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.room;
+    final r = currentRoom;
     return ListenableBuilder(
       listenable: widget.state,
       builder: (context, _) => Scaffold(
@@ -1437,7 +1454,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           children: [
                             Row(
                               children: [
-                                const AvatarPhoto(size: 30, online: true),
+                                AvatarPhoto(
+                                  size: 38,
+                                  online: true,
+                                  name: r.landlordName.isNotEmpty
+                                      ? r.landlordName
+                                      : 'Chủ trọ',
+                                  imageUrl: r.landlordAvatarUrl,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Column(
@@ -1445,7 +1469,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Chủ trọ đối tác Phòng Trọ Xanh',
+                                        r.landlordName.isNotEmpty
+                                            ? r.landlordName
+                                            : 'Chủ trọ đối tác Phòng Trọ Xanh',
                                         style: PT.title(13),
                                       ),
                                       Text(
@@ -1714,7 +1740,7 @@ class MenuReview extends StatelessWidget {
       children: [
         Row(
           children: [
-            const AvatarPhoto(size: 30),
+            AvatarPhoto(size: 30, name: name),
             const SizedBox(width: 8),
             Text(name, style: PT.title(15)),
             const Spacer(),

@@ -582,8 +582,8 @@ class DemoWorkflows {
     o.status = result;
     if (result == 'Thành công') {
       final profile = state.store.profiles[state.userId]!;
-      if (['plus', 'gold', 'owner-pro', 'owner-premium'].contains(o.plan.id) ||
-          o.plan.monthly >= 39000 && o.plan.extraSwipes == 0) {
+      if (['PRO_TENANT', 'VIP_TENANT', 'LANDLORD_BASIC', 'LANDLORD_VIP', 'LANDLORD_PRO', 'plus', 'gold', 'owner-pro', 'owner-premium'].contains(o.plan.id) ||
+          o.plan.monthly > 0) {
         profile.package = o.plan.name;
         profile.packageExpiry = DateTime.now().add(
           Duration(days: o.yearly ? 365 : 30),

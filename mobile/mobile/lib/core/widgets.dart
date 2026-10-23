@@ -8,8 +8,16 @@ import '../app/navigation.dart';
 import '../domain/models.dart';
 
 void openPage(BuildContext context, Widget page, {ResourceRef? target}) {
-  target ??= page is ResourceScreen ? (page as ResourceScreen).resource : null;
   final scope = AppScope.maybeOf(context);
+  try {
+    final dynamic p = page;
+    if (p.room != null) scope?.state.cacheRoom(p.room);
+  } catch (_) {}
+  try {
+    final dynamic p = page;
+    if (p.person != null) scope?.state.cachePerson(p.person);
+  } catch (_) {}
+  target ??= page is ResourceScreen ? (page as ResourceScreen).resource : null;
   final policy = RoutePolicy.forPage(page);
   void push() {
     if (!context.mounted) return;
@@ -436,13 +444,86 @@ class AvatarPhoto extends StatelessWidget {
   final PhotoKind kind;
   final double size;
   final bool online;
+  final String? name;
+  final String? imageUrl;
+
   const AvatarPhoto({
     super.key,
     this.kind = PhotoKind.man,
     this.size = 52,
     this.online = false,
     this.photo,
+    this.name,
+    this.imageUrl,
   });
+
+  static const List<Color> _avatarColors = [
+    Color(0xFF0F766E), // Teal
+    Color(0xFF1E40AF), // Blue
+    Color(0xFF6D28D9), // Purple
+    Color(0xFFBE185D), // Pink
+    Color(0xFFC2410C), // Orange
+    Color(0xFF047857), // Green
+    Color(0xFF4338CA), // Indigo
+    Color(0xFF0369A1), // Sky
+  ];
+
+  Color _nameColor(String text) {
+    int hash = 0;
+    for (int i = 0; i < text.length; i++) {
+      hash = text.codeUnitAt(i) + ((hash << 5) - hash);
+    }
+    return _avatarColors[hash.abs() % _avatarColors.length];
+  }
+
+  String _initial(String text) {
+    final clean = text.trim();
+    if (clean.isEmpty) return '?';
+    final parts =
+        clean.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts.first[0] + parts.last[0]).toUpperCase();
+  }
+
+  Widget _buildContent() {
+    if (photo != null) {
+      return LocalPhotoView(photo: photo!);
+    }
+    if (imageUrl != null &&
+        imageUrl!.trim().isNotEmpty &&
+        (imageUrl!.startsWith('http://') || imageUrl!.startsWith('https://'))) {
+      return Image.network(
+        imageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildFallback(),
+      );
+    }
+    return _buildFallback();
+  }
+
+  Widget _buildFallback() {
+    if (name != null && name!.trim().isNotEmpty) {
+      final color = _nameColor(name!);
+      return Container(
+        color: color,
+        alignment: Alignment.center,
+        child: Text(
+          _initial(name!),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: size * 0.40,
+            letterSpacing: -0.5,
+          ),
+        ),
+      );
+    }
+    return ReferencePhoto(kind: kind);
+  }
+
   @override
   Widget build(BuildContext context) => SizedBox(
     width: size,
@@ -452,9 +533,7 @@ class AvatarPhoto extends StatelessWidget {
       children: [
         Positioned.fill(
           child: ClipOval(
-            child: photo == null
-                ? ReferencePhoto(kind: kind)
-                : LocalPhotoView(photo: photo!),
+            child: _buildContent(),
           ),
         ),
         if (online)
@@ -462,8 +541,8 @@ class AvatarPhoto extends StatelessWidget {
             right: 0,
             bottom: 1,
             child: Container(
-              width: 12,
-              height: 12,
+              width: (size * 0.28).clamp(8.0, 14.0),
+              height: (size * 0.28).clamp(8.0, 14.0),
               decoration: BoxDecoration(
                 color: PT.green,
                 shape: BoxShape.circle,

@@ -305,101 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 10),
-                        if (!register) ...[
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: PT.card(color: PT.mint, radius: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Thử tài khoản mẫu (chạm để điền nhanh)',
-                                  style: PT.caption(PT.deep),
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    for (final account in [
-                                      (
-                                        'Người thuê',
-                                        'tenant@demo.vn',
-                                        LucideIcons.user,
-                                      ),
-                                      (
-                                        'Chủ trọ',
-                                        'landlord@demo.vn',
-                                        LucideIcons.house,
-                                      ),
-                                      (
-                                        'Quản trị',
-                                        'admin@demo.vn',
-                                        LucideIcons.shieldCheck,
-                                      ),
-                                    ])
-                                      Expanded(
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 2,
-                                          ),
-                                          child: Material(
-                                            color: login.text == account.$2
-                                                ? PT.green
-                                                : Colors.white,
-                                            borderRadius: BorderRadius.circular(
-                                              9,
-                                            ),
-                                            child: InkWell(
-                                              borderRadius:
-                                                  BorderRadius.circular(9),
-                                              onTap: busy
-                                                  ? null
-                                                  : () => setState(() {
-                                                      login.text = account.$2;
-                                                      password.text = 'demo123';
-                                                    }),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 7,
-                                                    ),
-                                                child: Column(
-                                                  children: [
-                                                    Icon(
-                                                      account.$3,
-                                                      size: 14,
-                                                      color:
-                                                          login.text ==
-                                                              account.$2
-                                                          ? Colors.white
-                                                          : PT.green,
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      account.$1,
-                                                      style: PT.caption(
-                                                        login.text == account.$2
-                                                            ? Colors.white
-                                                            : PT.deep,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
+
                         Form(
                           key: form,
                           child: Column(
@@ -592,57 +498,41 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            for (final social in [
-                              ('Google', PhotoKind.google),
-                              ('Apple', PhotoKind.apple),
-                              ('Facebook', PhotoKind.facebook),
-                            ])
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 3,
-                                  ),
-                                  child: OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 8,
-                                      ),
-                                      side: const BorderSide(color: PT.line),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(11),
-                                      ),
-                                    ),
-                                    onPressed: () => message(
-                                      context,
-                                      'Đăng nhập ${social.$1} sẽ hoạt động khi nối dịch vụ xác thực.',
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: ReferencePhoto(
-                                            kind: social.$2,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Flexible(
-                                          child: Text(
-                                            social.$1,
-                                            style: PT.body(11),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              side: const BorderSide(color: PT.line),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                            ),
+                            onPressed: () => message(
+                              context,
+                              'Đăng nhập Google sẽ hoạt động khi nối dịch vụ xác thực.',
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: ReferencePhoto(
+                                    kind: PhotoKind.google,
                                   ),
                                 ),
-                              ),
-                          ],
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Đăng nhập bằng Google',
+                                  style: PT.body(13, PT.deep),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
