@@ -625,9 +625,10 @@ class HttpAdminRepository {
   }
 
   /// API #79 / #81: GET /api/v1/admin/kyc/pending
-  Future<List<AdminKycItem>> getPendingKyc({String? search, int page = 0, int limit = 50}) async {
+  Future<List<AdminKycItem>> getPendingKyc({String? search, String? role, int page = 0, int limit = 50}) async {
     final uri = Uri.parse('$baseUrl/admin/kyc/pending').replace(queryParameters: {
       if (search != null && search.isNotEmpty) 'search': search,
+      if (role != null && role.isNotEmpty) 'role': role,
       'page': page.toString(),
       'limit': limit.toString(),
     });

@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../api/http_admin_repository.dart';
 import '../../app/app_state.dart';
 import '../../app/navigation.dart';
+import '../../core/async_resource.dart';
 import '../../core/flow_page.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
@@ -1244,8 +1245,13 @@ class _AdminScreenState extends State<AdminScreen> {
                     bg: pendingTotalActions > 0
                         ? const Color(0xFFFFF8ED)
                         : PT.mint,
-                    onTap: () =>
-                        openPage(context, AdminQueueScreen(state: state)),
+                    onTap: () => openPage(
+                      context,
+                      AdminQueueScreen(
+                        state: state,
+                        onQueueUpdated: _refreshDashboard,
+                      ),
+                    ),
                   ),
                 ];
 
@@ -1349,8 +1355,13 @@ class _AdminScreenState extends State<AdminScreen> {
                     badge: '${dashboard.pendingKycCount} chờ duyệt',
                     color: PT.green,
                     bg: PT.mint,
-                    onTap: () =>
-                        openPage(context, AdminQueueScreen(state: state)),
+                    onTap: () => openPage(
+                      context,
+                      AdminQueueScreen(
+                        state: state,
+                        onQueueUpdated: _refreshDashboard,
+                      ),
+                    ),
                   ),
                   (
                     icon: LucideIcons.house,
@@ -2564,7 +2575,8 @@ class _LifestyleRadarPainter extends CustomPainter {
 
 class AdminQueueScreen extends StatefulWidget {
   final AppState state;
-  const AdminQueueScreen({super.key, required this.state});
+  final VoidCallback? onQueueUpdated;
+  const AdminQueueScreen({super.key, required this.state, this.onQueueUpdated});
   @override
   State<AdminQueueScreen> createState() => _AdminQueueScreenState();
 }
@@ -2573,6 +2585,39 @@ class _AdminQueueScreenState extends State<AdminQueueScreen> {
   String filter = 'Chờ duyệt';
   String roleFilter = 'Tất cả vai trò';
   String query = '';
+  List<AdminKycItem>? _apiItems;
+  bool _loading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchKycQueue();
+  }
+
+  Future<void> _fetchKycQueue() async {
+    if (!widget.state.adminRepository.hasAuthToken) return;
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+    try {
+      final items = await widget.state.adminRepository.getPendingKyc();
+      if (mounted) {
+        setState(() {
+          _apiItems = items;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = e is RepositoryFailure ? e.message : 'Không thể tải danh sách KYC';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) => FlowPage(
@@ -2580,28 +2625,78 @@ class _AdminQueueScreenState extends State<AdminQueueScreen> {
     title: 'Duyệt CCCD',
     content: (ctx, f) {
       final s = widget.state;
-      final items = s.store.kyc.where((k) {
-        final statusOk = filter == 'Tất cả' || k.status == filter;
-        final userRole = s.store.profiles[k.userId]?.user.role;
-        final roleOk =
-            roleFilter == 'Tất cả vai trò' ||
-            (roleFilter == 'Người thuê' && userRole == UserRole.tenant) ||
-            (roleFilter == 'Chủ trọ' && userRole == UserRole.landlord);
-        final name = s.store.workspaceById(k.userId).fullName.toLowerCase();
-        final queryOk =
-            query.isEmpty ||
-            name.contains(query.toLowerCase()) ||
-            k.number.contains(query) ||
-            k.id.toLowerCase().contains(query.toLowerCase());
-        return statusOk && roleOk && queryOk;
-      }).toList();
+      final bool hasApiData = _apiItems != null;
+
+      final dynamic filteredItems;
+      if (hasApiData) {
+        filteredItems = _apiItems!.where((k) {
+          final statusOk = filter == 'Tất cả' || k.status == filter;
+          final roleStr = k.role.toUpperCase();
+          final roleOk = roleFilter == 'Tất cả vai trò' ||
+              (roleFilter == 'Người thuê' && roleStr == 'TENANT') ||
+              (roleFilter == 'Chủ trọ' && roleStr == 'LANDLORD');
+          final q = query.trim().toLowerCase();
+          final queryOk = q.isEmpty ||
+              k.fullName.toLowerCase().contains(q) ||
+              k.idCardNumber.contains(q) ||
+              k.id.toLowerCase().contains(q) ||
+              k.phone.contains(q) ||
+              k.email.toLowerCase().contains(q);
+          return statusOk && roleOk && queryOk;
+        }).toList();
+      } else {
+        filteredItems = s.store.kyc.where((k) {
+          final statusOk = filter == 'Tất cả' || k.status == filter;
+          final userRole = s.store.profiles[k.userId]?.user.role;
+          final roleOk =
+              roleFilter == 'Tất cả vai trò' ||
+              (roleFilter == 'Người thuê' && userRole == UserRole.tenant) ||
+              (roleFilter == 'Chủ trọ' && userRole == UserRole.landlord);
+          final name = s.store.workspaceById(k.userId).fullName.toLowerCase();
+          final q = query.trim().toLowerCase();
+          final queryOk =
+              q.isEmpty ||
+              name.contains(q) ||
+              k.number.contains(q) ||
+              k.id.toLowerCase().contains(q);
+          return statusOk && roleOk && queryOk;
+        }).toList();
+      }
+
       return [
-        TextField(
-          decoration: const InputDecoration(
-            labelText: 'Tìm theo tên, số CCCD hoặc mã hồ sơ',
-            prefixIcon: Icon(LucideIcons.search),
-          ),
-          onChanged: (v) => setState(() => query = v),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Tìm theo tên, số CCCD hoặc mã hồ sơ',
+                  prefixIcon: Icon(LucideIcons.search),
+                ),
+                onChanged: (v) => setState(() => query = v),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: PT.mint,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                icon: _loading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: PT.green,
+                        ),
+                      )
+                    : const Icon(LucideIcons.refreshCw, color: PT.green, size: 20),
+                onPressed: _loading ? null : _fetchKycQueue,
+                tooltip: 'Làm mới',
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -2632,21 +2727,144 @@ class _AdminQueueScreenState extends State<AdminQueueScreen> {
               .toList(),
         ),
         const SizedBox(height: 16),
-        if (items.isEmpty)
+        if (_loading && (hasApiData ? _apiItems!.isEmpty : true))
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_errorMessage != null && (filteredItems as List).isEmpty)
+          EmptyState(
+            'Không thể tải hồ sơ',
+            '$_errorMessage',
+            action: PrimaryButton('Thử lại', onTap: _fetchKycQueue),
+          )
+        else if ((filteredItems as List).isEmpty)
           const EmptyState(
             'Không có hồ sơ trong mục này',
             'Hồ sơ gửi từ người thuê hoặc chủ trọ sẽ xuất hiện tại đây.',
-          ),
-        for (final k in items.reversed)
-          MenuRow(
-            icon: LucideIcons.fileCheck,
-            title: s.store.workspaceById(k.userId).fullName,
-            subtitle: '${k.id} • CCCD ${k.number} • ${k.status}',
-            onTap: () => openPage(
-              ctx,
-              AdminDecisionScreen(state: s, kind: 'kyc', id: k.id),
+          )
+        else if (hasApiData)
+          for (final AdminKycItem k in filteredItems as List<AdminKycItem>)
+            InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                openPage(
+                  ctx,
+                  AdminDecisionScreen(
+                    state: s,
+                    kind: 'kyc',
+                    id: k.id,
+                    kycItem: k,
+                    onReviewed: () {
+                      _fetchKycQueue();
+                      widget.onQueueUpdated?.call();
+                    },
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: PT.line.withValues(alpha: 0.85)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0A073B3C),
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: PT.mint,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        LucideIcons.fileCheck,
+                        color: PT.green,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  k.fullName.isEmpty ? 'Chưa cập nhật tên' : k.fullName,
+                                  style: PT.title(15),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Pill(
+                                k.role.toUpperCase() == 'LANDLORD' ? 'Chủ trọ' : 'Người thuê',
+                                dense: true,
+                                color: k.role.toUpperCase() == 'LANDLORD'
+                                    ? PT.green
+                                    : const Color(0xFF0799DE),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'CCCD: ${k.idCardNumber} • ${k.phone.isNotEmpty ? k.phone : (k.email.isNotEmpty ? k.email : k.id)}',
+                            style: PT.body(12, PT.muted),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Pill(
+                                k.status,
+                                dense: true,
+                                color: k.status == 'Đã xác minh'
+                                    ? PT.green
+                                    : (k.status == 'Đã từ chối' ? PT.error : PT.amber),
+                              ),
+                              if (k.createdAt != null && k.createdAt!.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  k.createdAt!.length > 10
+                                      ? k.createdAt!.substring(0, 10)
+                                      : k.createdAt!,
+                                  style: PT.body(11, PT.muted),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(LucideIcons.chevronRight, size: 18, color: PT.muted),
+                  ],
+                ),
+              ),
+            )
+        else
+          for (final k in filteredItems.reversed)
+            MenuRow(
+              icon: LucideIcons.fileCheck,
+              title: s.store.workspaceById(k.userId).fullName,
+              subtitle: '${k.id} • CCCD ${k.number} • ${k.status}',
+              onTap: () => openPage(
+                ctx,
+                AdminDecisionScreen(state: s, kind: 'kyc', id: k.id),
+              ),
             ),
-          ),
       ];
     },
   );
@@ -2827,11 +3045,16 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 class AdminDecisionScreen extends StatefulWidget {
   final AppState state;
   final String kind, id;
+  final AdminKycItem? kycItem;
+  final VoidCallback? onReviewed;
+
   const AdminDecisionScreen({
     super.key,
     required this.state,
     required this.kind,
     required this.id,
+    this.kycItem,
+    this.onReviewed,
   });
   @override
   State<AdminDecisionScreen> createState() => _AdminDecisionScreenState();
@@ -2846,6 +3069,137 @@ class _AdminDecisionScreenState extends State<AdminDecisionScreen> {
     super.dispose();
   }
 
+  Widget _buildKycDocPreview({
+    required BuildContext context,
+    required String label,
+    required String? url,
+  }) {
+    final hasUrl = url != null && url.trim().isNotEmpty;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: PT.line.withValues(alpha: 0.85)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A073B3C),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(label, style: PT.title(14)),
+                if (hasUrl)
+                  TextButton.icon(
+                    icon: const Icon(LucideIcons.zoomIn, size: 14),
+                    label: const Text('Phóng to', style: TextStyle(fontSize: 12)),
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (d) => Dialog(
+                        backgroundColor: Colors.transparent,
+                        insetPadding: const EdgeInsets.all(16),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            color: Colors.black,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AppBar(
+                                  title: Text(label),
+                                  backgroundColor: Colors.transparent,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                ),
+                                InteractiveViewer(
+                                  minScale: 0.8,
+                                  maxScale: 4.0,
+                                  child: Image.network(
+                                    url,
+                                    fit: BoxFit.contain,
+                                    loadingBuilder: (c, w, p) => p == null
+                                        ? w
+                                        : const Center(
+                                            child: Padding(
+                                              padding: EdgeInsets.all(40),
+                                              child: CircularProgressIndicator(color: Colors.white),
+                                            ),
+                                          ),
+                                    errorBuilder: (c, e, s) => const Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(40),
+                                        child: Text(
+                                          'Không thể tải ảnh',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+            child: Container(
+              height: 200,
+              width: double.infinity,
+              color: const Color(0xFFF1F5F9),
+              child: hasUrl
+                  ? (url.startsWith('http://') || url.startsWith('https://'))
+                      ? Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (c, w, p) => p == null
+                              ? w
+                              : const Center(child: CircularProgressIndicator()),
+                          errorBuilder: (c, e, s) => Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(LucideIcons.imageOff, size: 36, color: PT.muted),
+                                const SizedBox(height: 6),
+                                Text('Không thể tải ảnh định danh', style: PT.body(12, PT.muted)),
+                              ],
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text('Định dạng ảnh không hỗ trợ', style: PT.body(12, PT.muted)),
+                        )
+                  : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(LucideIcons.fileWarning, size: 36, color: PT.muted),
+                          const SizedBox(height: 6),
+                          Text('Chưa có ảnh $label', style: PT.body(12, PT.muted)),
+                        ],
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => FlowPage(
     state: widget.state,
@@ -2853,8 +3207,10 @@ class _AdminDecisionScreenState extends State<AdminDecisionScreen> {
     content: (ctx, f) {
       final s = widget.state;
       if (widget.kind == 'kyc') {
+        final apiItem = widget.kycItem;
         final k = s.store.kyc.where((k) => k.id == widget.id).firstOrNull;
-        if (k == null) {
+
+        if (apiItem == null && k == null) {
           return [
             const EmptyState(
               'Hồ sơ không tồn tại',
@@ -2862,8 +3218,106 @@ class _AdminDecisionScreenState extends State<AdminDecisionScreen> {
             ),
           ];
         }
+
+        if (apiItem != null) {
+          final isPending = apiItem.status == 'Chờ duyệt';
+          final roleText = apiItem.role.toUpperCase() == 'LANDLORD' ? 'Chủ trọ' : 'Người thuê';
+          return [
+            flowCard(apiItem.fullName.isNotEmpty ? apiItem.fullName : 'Hồ sơ KYC', [
+              Row(
+                children: [
+                  Pill(
+                    apiItem.status,
+                    color: apiItem.status == 'Đã xác minh'
+                        ? PT.green
+                        : (apiItem.status == 'Đã từ chối' ? PT.error : PT.amber),
+                  ),
+                  const SizedBox(width: 8),
+                  Pill(roleText, color: roleText == 'Chủ trọ' ? PT.green : const Color(0xFF0799DE)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Số CCCD: ${apiItem.idCardNumber}', style: PT.title(15)),
+              if (apiItem.phone.isNotEmpty) Text('Số điện thoại: ${apiItem.phone}'),
+              if (apiItem.email.isNotEmpty) Text('Email: ${apiItem.email}'),
+              Text('Mã định danh: ${apiItem.id}', style: PT.body(11, PT.muted)),
+              if (apiItem.createdAt != null && apiItem.createdAt!.isNotEmpty)
+                Text('Thời gian nộp: ${apiItem.createdAt}', style: PT.body(11, PT.muted)),
+            ]),
+            _buildKycDocPreview(
+              context: ctx,
+              label: 'Mặt trước CCCD',
+              url: apiItem.frontUrl,
+            ),
+            const SizedBox(height: 16),
+            _buildKycDocPreview(
+              context: ctx,
+              label: 'Mặt sau CCCD',
+              url: apiItem.backUrl,
+            ),
+            const SizedBox(height: 16),
+            if (isPending) ...[
+              TextField(
+                controller: note,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Ghi chú / lý do từ chối (bắt buộc khi từ chối)',
+                  hintText: 'Nhập lý do từ chối để thông báo cho người dùng...',
+                ),
+              ),
+              const SizedBox(height: 16),
+              PrimaryButton(
+                'Duyệt hồ sơ',
+                busy: f.busy,
+                onTap: f.busy
+                    ? null
+                    : () => f.perform(() async {
+                        await s.adminRepository.approveKyc(apiItem.id);
+                        widget.onReviewed?.call();
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx, true);
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(
+                              content: Text('Đã phê duyệt hồ sơ CCCD thành công'),
+                              backgroundColor: PT.green,
+                            ),
+                          );
+                        }
+                      }),
+              ),
+              const SizedBox(height: 12),
+              PrimaryButton(
+                'Từ chối hồ sơ',
+                outline: true,
+                onTap: f.busy
+                    ? null
+                    : () => f.perform(() async {
+                        final reason = note.text.trim();
+                        if (reason.isEmpty) {
+                          throw const RepositoryFailure(
+                            RepositoryFault.denied,
+                            'Vui lòng nhập lý do từ chối để gửi cho người dùng.',
+                          );
+                        }
+                        await s.adminRepository.rejectKyc(apiItem.id, reason);
+                        widget.onReviewed?.call();
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx, true);
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(
+                              content: Text('Đã từ chối hồ sơ CCCD'),
+                              backgroundColor: PT.amber,
+                            ),
+                          );
+                        }
+                      }),
+              ),
+            ],
+          ];
+        }
+
         return [
-          flowCard(s.store.workspaceById(k.userId).fullName, [
+          flowCard(s.store.workspaceById(k!.userId).fullName, [
             Text('${k.id} • ${k.status}'),
             Text('Số CCCD: ${k.number}'),
             if (k.note.isNotEmpty) Text(k.note),
